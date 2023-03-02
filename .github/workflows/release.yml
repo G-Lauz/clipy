@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint-and-test:
-    - uses: ./.github/workflows/validation.yml
+    uses: ./.github/workflows/validation.yml
 
   release:
     needs: lint-and-test
