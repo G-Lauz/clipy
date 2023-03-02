@@ -1,0 +1,12 @@
+name: Lint and test
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+  test:
+    needs: lint
+    uses: ./.github/workflows/test.yml
