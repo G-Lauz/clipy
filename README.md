@@ -37,7 +37,7 @@ python script.py --arg1 value1 --arg2 value2
 
 ## Installation
 ```bash
-pip install clipy
+pip install clipyx
 ```
 From Github:
 ```bash

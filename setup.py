@@ -14,7 +14,7 @@ def read(fname: str):
 
 setuptools.setup(
     name="clipy",
-    version="0.0.1",
+    version="0.0.6",
     description="A command line interface package.",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",

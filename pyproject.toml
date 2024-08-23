@@ -1,3 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clipyx"
+version = "0.0.6"
+authors = [
+  { name="G-Lauz", email="gabriel.lauzier@usherbrooke.ca" },
+]
+description = "A command line interface package."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/G-Lauz/clipy"
+Issues = "https://github.com/G-Lauz/clipy/issues"
+
 [tool.black]
 line-length = 88
 target-version = ['py38', 'py39', 'py310']
