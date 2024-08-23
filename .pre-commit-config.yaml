@@ -21,15 +21,16 @@ repos:
       - id: black
         name: black
         entry: black
-        language: system
+        language: python
         types: [python]
-        stages: [commit]
+        additional_dependencies: [black==23.1.0]
         log_file: .black.log
+        stages: [commit]
 
       - id: pylint
         name: pylint
-        entry: pylint
-        language: system
+        entry: "python lint.py --threshold 9 --path"
+        language: python
         types: [python]
-        args: ["--rcfile=pylintrc"]
+        additional_dependencies: [pylint==2.16.2]
         stages: [commit]

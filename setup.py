@@ -22,5 +22,5 @@ setuptools.setup(
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src", exclude=["tests", "tests.*"]),
     install_requires=[],
-    entry_points={"console_scripts": ["clipy=clipy.cli:main"]},
+    # entry_points={"console_scripts": ["clipy=clipy.cli:main"]},
 )

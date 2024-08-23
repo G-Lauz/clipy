@@ -1,6 +1,9 @@
 """ Core module of Clipy
 """
 
-from .dummy import dummy_func
+from .clipy import argument, command
 
-__all__ = ["dummy_func"]
+__all__ = [
+    "command",
+    "argument",
+]
