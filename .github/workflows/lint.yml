@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -40,5 +40,5 @@ jobs:
         if: always() && steps.run-pre-commit.outcome == 'failure'
         run: |
           if [ -f ".black.log" ]; then
-            grep -o 'reformatted .*\.py' .black.log | sed 's/reformatted \(.*\.py\)/\1: This file is unformatted. Run `black .`
+            grep -o 'reformatted .*\.py' .black.log | sed 's/reformatted \(.*\.py\)/\1: This file is unformatted. Run `black .`'
           fi

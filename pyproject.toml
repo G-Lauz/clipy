@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clipyx"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
   { name="G-Lauz", email="gabriel.lauzier@usherbrooke.ca" },
 ]
 description = "A command line interface package."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",

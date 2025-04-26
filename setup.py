@@ -1,5 +1,5 @@
-""" Setup clipy package
-"""
+"""Setup clipy package"""
+
 import os
 
 import setuptools
@@ -12,7 +12,7 @@ def read(fname: str):
 
 setuptools.setup(
     name="clipy",
-    version="0.1.0",
+    version="0.2.0",
     description="A command line interface package.",
     long_description=read("README.md"),
     long_description_content_type="text/markdown",

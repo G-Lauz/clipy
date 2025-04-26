@@ -1,6 +1,7 @@
 """
 An example of a simple CLI with two arguments.
 """
+
 import clipy
 
 

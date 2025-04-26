@@ -1,5 +1,4 @@
-""" Core module of Clipy
-"""
+"""Core module of Clipy"""
 
 from .cli_types import CommandDefinition, OptionDefinition
 from .clipy import argument, command

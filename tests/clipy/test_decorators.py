@@ -1,5 +1,3 @@
-import pytest
-
 from clipy.cli import CLI
 from clipy.cli_types import CommandDefinition, OptionDefinition
 from clipy.decorators import App, Command, Option
@@ -42,6 +40,24 @@ def test_command_with_options():
     assert isinstance(func, CLI)
     assert len(func.commands[0].options) == 1
     assert func.commands[0].options[0].name == "test_option"
+
+
+def test_command_with_subcommands():
+    test_subcommand = Command("test", "This is a test subcommand", "This is a test subcommand")
+
+    @App(usage="test app usage", description="test app description")
+    @Command(
+        "test_cmd",
+        "This is a test command",
+        "This is a test command",
+        subcommands=[test_subcommand.definition],
+    )
+    def func():
+        pass
+
+    assert isinstance(func, CLI)
+    assert len(func.commands[0].subcommands) == 1
+    assert func.commands[0].subcommands[0].name == "test"
 
 
 def test_app_decorator():
@@ -93,3 +109,16 @@ def test_ensure_cli_wrapper():
     # Test wrapping already wrapped function
     double_wrapped = App.ensure_cli_wrapper(wrapped)
     assert double_wrapped is wrapped
+
+
+def test_command_dynamic_properties():
+    cmd = Command("cmd1", usage="cmd1 usage", description="cmd1 description")
+    cmd2 = Command("cmd2", usage="cmd2 usage", description="cmd2 description")
+
+    assert cmd.name == cmd.definition.name
+    assert cmd.usage == cmd.definition.usage
+    assert cmd.description == cmd.definition.description
+
+    assert cmd2.name == "cmd2"
+    assert cmd2.usage == "cmd2 usage"
+    assert cmd2.description == "cmd2 description"

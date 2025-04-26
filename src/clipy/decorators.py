@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 
 from .cli import CLI
 from .cli_types import CommandDefinition, OptionDefinition
@@ -37,8 +37,8 @@ class Option(CLIDecorator):
     ```
     """
 
-    def __init__(self, name: str, **kwargs):
-        self.definition = OptionDefinition(name=name, kwargs=kwargs)
+    def __init__(self, name: str, positional: bool = False, **kwargs):
+        self.definition = OptionDefinition(name=name, positional=positional, kwargs=kwargs)
 
     @property
     def name(self) -> str:
@@ -47,6 +47,10 @@ class Option(CLIDecorator):
     @property
     def kwargs(self) -> dict:
         return self.definition.kwargs
+
+    @property
+    def positional(self) -> bool:
+        return self.definition.positional
 
     def __call__(self, func: Callable[..., Any]) -> CLI:
         wrapper: CLI = self.ensure_cli_wrapper(func)
@@ -62,6 +66,7 @@ class Command(CLIDecorator):
     :param usage: Usage string for the command.
     :param description: Description string for the command.
     :param options: List of `OptionDefinition` instances for the command. Default is an empty list.
+    :param subcommands: List of `CommandDefinition` instances for subcommands. Default is None.
 
     When used as a decorator, the `__call__` will return a `CLI` instance with the command registered.
 
@@ -81,13 +86,28 @@ class Command(CLIDecorator):
         usage: str = None,
         description: str = None,
         options: List[OptionDefinition] = None,
+        subcommands: Optional[List[CommandDefinition]] = None,
     ):
         self.definition = CommandDefinition(
-            name=name, usage=usage, description=description, options=options
+            name=name,
+            usage=usage,
+            description=description,
+            options=options,
+            subcommands=subcommands,
         )
+
+        for member in self.definition.__dict__:
+            setattr(
+                self.__class__,
+                member,
+                property(fget=lambda self, v=member: getattr(self.definition, v)),
+            )
 
     def register_option(self, option: OptionDefinition):
         self.definition.register_option(option)
+
+    def register_subcommand(self, subcommand: CommandDefinition):
+        self.definition.register_subcommand(subcommand)
 
     def __call__(self, func: Callable[..., Any]) -> CLI:
         wrapper: CLI = self.ensure_cli_wrapper(func)

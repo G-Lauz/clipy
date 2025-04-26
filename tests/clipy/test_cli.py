@@ -59,6 +59,52 @@ def test_build_parser():
     assert parser.description == "test description"
 
 
+def test_build_parser_with_subcommands():
+    mock_func = Mock()
+    cli = CLI(mock_func, usage="test usage", description="test description")
+
+    # Add global option
+    global_option = OptionDefinition(name="global", kwargs={"help": "global option"})
+    cli.register_global_option(global_option)
+
+    # Create the subcommand with a specific option
+    subcommand = CommandDefinition(
+        name="subcommand",
+        usage="subcommand usage",
+        description="subcommand description",
+        options=[OptionDefinition(name="cmd_opt", kwargs={"help": "command option"})],
+    )
+
+    # Register the subcommand with the main command.
+    # Usage would be : test subcommand --cmd_opt some_value
+    command = CommandDefinition(
+        name="test", usage="test usage", description="test description", subcommands=[subcommand]
+    )
+    cli.register_command(command)
+
+    parser = cli.build_parser()
+
+    main_command = [
+        action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
+    ][0].choices["test"]
+    assert isinstance(main_command, argparse.ArgumentParser)
+    assert main_command.usage == "test usage"
+    assert main_command.description == "test description"
+
+    sub_command = [
+        action for action in main_command._actions if isinstance(action, argparse._SubParsersAction)
+    ][0].choices["subcommand"]
+    assert isinstance(sub_command, argparse.ArgumentParser)
+    assert sub_command.usage == "subcommand usage"
+    assert sub_command.description == "subcommand description"
+
+    # TODO: Nested subparsers : change this assert from 'subcommand_cmd_opt' to 'cmd_opt'
+    #       when the subcommands implemention is integrated with argparse using custom actions and namespaces
+    assert {action.dest for action in sub_command._get_optional_actions()} == set(
+        ["subcommand__cmd_opt", "help"]
+    )
+
+
 def test_cli_call():
     mock_func = Mock()
     cli = CLI(mock_func)
@@ -69,6 +115,41 @@ def test_cli_call():
     cli.register_command(command)
 
     with patch("sys.argv", ["prog", "test", "--opt", "value"]):
+        cli()
+        mock_func.assert_called_once()
+
+
+def test_cli_call_with_subcommands():
+    mock_func = Mock()
+    cli = CLI(mock_func)
+
+    command = CommandDefinition(
+        name="test",
+        subcommands=[
+            CommandDefinition(
+                name="subcommand",
+                options=[OptionDefinition(name="opt", kwargs={"help": "test option"})],
+            )
+        ],
+    )
+    cli.register_command(command)
+
+    with patch("sys.argv", ["prog", "test", "subcommand", "--opt", "value"]):
+        cli()
+        mock_func.assert_called_once()
+
+
+def test_cli_positional_arg():
+    mock_func = Mock()
+    cli = CLI(mock_func)
+
+    command = CommandDefinition(
+        name="test",
+        options=[OptionDefinition(name="opt", positional=True, kwargs={"help": "test option"})],
+    )
+    cli.register_command(command)
+
+    with patch("sys.argv", ["prog", "test", "value"]):
         cli()
         mock_func.assert_called_once()
 
