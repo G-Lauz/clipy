@@ -109,17 +109,21 @@ class CLI:
             all_commands.append(command)
             args_dict = subcommand
 
-        subcommand = all_commands[-1]
-        for command in reversed(all_commands[:-1]):
-            subcommand = CommandDefinition(
-                name=command.name,
-                subcommands=[subcommand],
-                options=command.options,
-                description=command.description,
-                usage=command.usage,
-            )
+        if not all_commands:  # this means only App with options was called
+            app_command = CommandDefinition(name="app", options=args_dict)
+            return self.func(command=app_command, *args, **kwargs)
+        else:
+            subcommand = all_commands[-1]
+            for command in reversed(all_commands[:-1]):
+                subcommand = CommandDefinition(
+                    name=command.name,
+                    subcommands=[subcommand],
+                    options=command.options,
+                    description=command.description,
+                    usage=command.usage,
+                )
 
-        return self.func(command=subcommand, *args, **kwargs)
+            return self.func(command=subcommand, *args, **kwargs)
 
     @staticmethod
     def _parse_nested_commands(parser: argparse.ArgumentParser) -> dict:
@@ -137,7 +141,8 @@ class CLI:
             return {
                 k.replace(command_name + "__", ""): v
                 for k, v in args_dict.items()
-                if k.startswith(command_name + "__")
+                if (not command_name and not k.startswith("__"))
+                or (command_name and k.startswith(command_name + "__"))
             }
 
         # iterate through the subcommands and build the commands tree
@@ -155,7 +160,7 @@ class CLI:
 
         # Remove the subcommand options from the main command
         main_command_name = args_dict.get("command")
-        main_command_options = clean_opts(args_dict, main_command_name)
+        main_command_options = clean_opts(args_dict, main_command_name or "")
 
         return {
             "command": main_command_name,
