@@ -4,12 +4,6 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-    inputs:
-      publish_to_pypi:
-        description: 'Publish to PyPI?'
-        required: false
-        default: 'false'
-        type: boolean
 
 jobs:
   lint-and-test:
