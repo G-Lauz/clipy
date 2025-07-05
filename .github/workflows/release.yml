@@ -115,12 +115,6 @@ jobs:
           python3 -m pip install --upgrade build
           python3 -m build
 
-      - name: Store the distribution packages
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-package-distributions
-          path: dist/
-
       - name: Get wheel name
         id: get_wheel_filename
         working-directory: dist
@@ -137,21 +131,3 @@ jobs:
           asset_path: dist/${{steps.get_wheel_filename.outputs.filename}}
           asset_name: ${{steps.get_wheel_filename.outputs.filename}}
           asset_content_type: application/octet-stream
-
-  publish-to-pypi:
-    needs: upload
-    if: github.event.inputs.publish_to_pypi == 'true'
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/clipyx/
-    permissions:
-      id-token: write
-    steps:
-      - name: Download all the dists
-        uses: actions/download-artifact@v4
-        with:
-          name: python-package-distributions
-          path: dist/
-      - name: Publishing to pypi
-        uses: pypa/gh-action-pypi-publish@release/v1
