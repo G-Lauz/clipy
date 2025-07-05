@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+import clipy
 from clipy.cli import CLI
 from clipy.cli_types import CommandDefinition, OptionDefinition
 
@@ -164,3 +165,66 @@ def test_cli_help_message(capsys):
 
     captured = capsys.readouterr()
     assert "Test CLI" in captured.out
+
+
+def test_command_with_argument_decorator():
+    @clipy.App(usage="test.py --arg1 <arg1>", description="Test command")
+    @clipy.Option("arg1", help="Test argument", type=int, required=True)
+    def func(command: clipy.CommandDefinition):
+        return command.options["arg1"]
+
+    with patch("sys.argv", ["test.py", "--arg1", "42"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == 42
+
+
+def test_missing_required_argument():
+    @clipy.App(usage="test.py --arg1 <arg1>", description="Test command")
+    @clipy.Option("arg1", help="Test argument", type=int, required=True)
+    def func(command: clipy.CommandDefinition):
+        return command.options["arg1"]
+
+    with patch("sys.argv", ["test.py"]):
+        with pytest.raises(SystemExit):
+            func()  # pylint: disable=no-value-for-parameter
+
+
+def test_invalid_argument_type():
+    @clipy.App(usage="test.py --arg1 <arg1>", description="Test command")
+    @clipy.Option("arg1", help="Test argument", type=int, required=True)
+    def func(command: clipy.CommandDefinition):
+        return command.options["arg1"]
+
+    with patch("sys.argv", ["test.py", "--arg1", "invalid"]):
+        with pytest.raises(SystemExit):
+            func()  # pylint: disable=no-value-for-parameter
+
+
+def test_multiple_arguments():
+    @clipy.App(usage="test.py --arg1 <arg1> --arg2 <arg2>", description="Test command")
+    @clipy.Option("arg1", help="Test argument 1", type=int, required=True)
+    @clipy.Option("arg2", help="Test argument 2", type=str, required=True)
+    def func(command: clipy.CommandDefinition):
+        arg1 = command.options["arg1"]
+        arg2 = command.options["arg2"]
+        return arg1, arg2
+
+    with patch("sys.argv", ["test.py", "--arg1", "42", "--arg2", "hello"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == (42, "hello")
+
+
+def test_help_message(capsys):
+    @clipy.App(usage="test.py --arg1 <arg1>", description="Test command")
+    @clipy.Option("arg1", help="Test argument", type=int, required=True)
+    def func(command: clipy.CommandDefinition):
+        arg1 = command.options["arg1"]
+        arg1 = arg1 + 1
+
+    with patch("sys.argv", ["test.py", "--help"]):
+        with pytest.raises(SystemExit):
+            func()  # pylint: disable=no-value-for-parameter
+
+    captured = capsys.readouterr()
+    assert "Test argument" in captured.out
+    assert "Test command" in captured.out
