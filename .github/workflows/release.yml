@@ -4,6 +4,12 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
+    inputs:
+      publish_to_pypi:
+        description: 'Publish to PyPI?'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   lint-and-test:
@@ -26,7 +32,8 @@ jobs:
           minor_pattern: "(MINOR)"
           format: "${major}.${minor}.${patch}-pre${increment}"
           short_tags: false
-          bump_each_commit: true
+          bump_each_commit: false
+          bump_each_commit_patch_pattern: "(PATCH)"
 
       - name: Generate version number
         id: generate_version_output
@@ -133,7 +140,7 @@ jobs:
 
   publish-to-pypi:
     needs: upload
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event.inputs.publish_to_pypi == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
