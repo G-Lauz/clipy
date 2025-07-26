@@ -1,6 +1,6 @@
-from clipy.cli import CLI
-from clipy.cli_types import CommandDefinition, OptionDefinition
-from clipy.decorators import App, Command, Option
+from clipy_legacy.cli import CLI
+from clipy_legacy.cli_types import CommandDefinition, OptionDefinition
+from clipy_legacy.decorators import App, Command, Option
 
 
 def test_option_decorator():

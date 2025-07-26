@@ -6,12 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
-import clipy
+import clipy_legacy
 
 
 def test_command_with_argument_decorator():
-    @clipy.command(usage="test.py --arg1 <arg1>", description="Test command")
-    @clipy.argument("arg1", help="Test argument", type=int, required=True)
+    @clipy_legacy.command(usage="test.py --arg1 <arg1>", description="Test command")
+    @clipy_legacy.argument("arg1", help="Test argument", type=int, required=True)
     def func(*_args, arg1, **_kwargs):
         return arg1
 
@@ -21,8 +21,8 @@ def test_command_with_argument_decorator():
 
 
 def test_missing_required_argument():
-    @clipy.command(usage="test.py --arg1 <arg1>", description="Test command")
-    @clipy.argument("arg1", help="Test argument", type=int, required=True)
+    @clipy_legacy.command(usage="test.py --arg1 <arg1>", description="Test command")
+    @clipy_legacy.argument("arg1", help="Test argument", type=int, required=True)
     def func(*_args, arg1, **_kwargs):
         return arg1
 
@@ -32,8 +32,8 @@ def test_missing_required_argument():
 
 
 def test_invalid_argument_type():
-    @clipy.command(usage="test.py --arg1 <arg1>", description="Test command")
-    @clipy.argument("arg1", help="Test argument", type=int, required=True)
+    @clipy_legacy.command(usage="test.py --arg1 <arg1>", description="Test command")
+    @clipy_legacy.argument("arg1", help="Test argument", type=int, required=True)
     def func(*_args, arg1, **_kwargs):
         return arg1
 
@@ -43,9 +43,9 @@ def test_invalid_argument_type():
 
 
 def test_multiple_arguments():
-    @clipy.command(usage="test.py --arg1 <arg1> --arg2 <arg2>", description="Test command")
-    @clipy.argument("arg1", help="Test argument 1", type=int, required=True)
-    @clipy.argument("arg2", help="Test argument 2", type=str, required=True)
+    @clipy_legacy.command(usage="test.py --arg1 <arg1> --arg2 <arg2>", description="Test command")
+    @clipy_legacy.argument("arg1", help="Test argument 1", type=int, required=True)
+    @clipy_legacy.argument("arg2", help="Test argument 2", type=str, required=True)
     def func(*_args, arg1, arg2, **_kwargs):
         return arg1, arg2
 
@@ -55,8 +55,8 @@ def test_multiple_arguments():
 
 
 def test_help_message(capsys):
-    @clipy.command(usage="test.py --arg1 <arg1>", description="Test command")
-    @clipy.argument("arg1", help="Test argument", type=int, required=True)
+    @clipy_legacy.command(usage="test.py --arg1 <arg1>", description="Test command")
+    @clipy_legacy.argument("arg1", help="Test argument", type=int, required=True)
     def func(*_args, arg1, **_kwargs):
         arg1 = arg1 + 1
 

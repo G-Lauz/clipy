@@ -2,12 +2,12 @@
 An example of a simple CLI with two arguments.
 """
 
-import clipy
+import clipy_legacy
 
 
-@clipy.command()
-@clipy.argument("arg1", help="an argument", type=str, required=True)
-@clipy.argument("arg2", help="another argument", type=str, required=False)
+@clipy_legacy.command()
+@clipy_legacy.argument("arg1", help="an argument", type=str, required=True)
+@clipy_legacy.argument("arg2", help="another argument", type=str, required=False)
 def main(*_args, arg1, arg2, **_kwargs):
     print("Argument 1:", arg1)
     print("Argument 2:", arg2)
