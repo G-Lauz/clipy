@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 import clipy
 
 
@@ -20,6 +22,16 @@ def test_command_args():
     with patch("sys.argv", ["test.py", "--option1", "42", "--option2", "hello"]):
         result = func()  # pylint: disable=no-value-for-parameter
         assert result == (42, "hello")
+
+
+def test_missing_required_argument():
+    @clipy.Command
+    def func(option1: int, option2: str):
+        return option1, option2
+
+    with patch("sys.argv", ["test.py", "--option1", "42"]):
+        with pytest.raises(SystemExit):
+            func()  # pylint: disable=missing-kwoa
 
 
 def test_command_args_no_type():
@@ -127,6 +139,10 @@ def test_command_positional_and_optional_args():
         result = func()  # pylint: disable=no-value-for-parameter
         assert result == (42, "hello")
 
+    with patch("sys.argv", ["test.py", "42", "--arg2", "hello"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == (42, "hello")
+
 
 def test_command_list_args():
     @clipy.Command
@@ -137,6 +153,7 @@ def test_command_list_args():
         result = func()  # pylint: disable=no-value-for-parameter
         assert result == (["item1", "item2"], 42)
 
+    @clipy.Command
     def func2(arg1: int, *arg2):
         return arg1, arg2
 
@@ -154,6 +171,7 @@ def test_command_dict_args():
         result = func()  # pylint: disable=no-value-for-parameter
         assert result == ({"key1": "value1", "key2": "value2"}, 42)
 
+    @clipy.Command
     def func2(arg1: int, **arg2):
         return arg1, arg2
 

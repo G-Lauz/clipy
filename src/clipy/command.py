@@ -37,6 +37,8 @@ class Command(abc.ABC):
             return self
 
         parsed_args = self.parser.parse_args()
+        self._check_for_empty_args(parsed_args)
+
         binding = self.signature.bind(**parsed_args)
         binding.apply_defaults()
         return self.func(*binding.args, **binding.kwargs)
@@ -65,6 +67,17 @@ class Command(abc.ABC):
         self.parser = ArgparseParser()
         for arg in self.args.values():
             self.parser.add_argument(arg)
+
+    def _check_for_empty_args(self, parsed_args):
+        missing_args = []
+        for arg, value in parsed_args.items():
+            if value is inspect.Parameter.empty:
+                missing_args.append(arg)
+
+        if missing_args:
+            print(f"Missing required arguments: {', '.join(missing_args)}")
+            print(f"Usage: {self.usage}")
+            sys.exit(1)
 
     def _get_name(self, name=None):
         if name:
