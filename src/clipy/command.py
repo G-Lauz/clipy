@@ -76,7 +76,7 @@ class Command(abc.ABC):
 
         if missing_args:
             print(f"Missing required arguments: {', '.join(missing_args)}")
-            print(f"Usage: {self.usage}")
+            print(f"usage: {self.usage}")
             sys.exit(1)
 
     def _get_name(self, name=None):

@@ -31,7 +31,7 @@ def test_missing_required_argument():
 
     with patch("sys.argv", ["test.py", "--option1", "42"]):
         with pytest.raises(SystemExit):
-            func()  # pylint: disable=missing-kwoa
+            func()  # pylint: disable=no-value-for-parameter
 
 
 def test_command_args_no_type():
