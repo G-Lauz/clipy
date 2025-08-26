@@ -1,8 +1,9 @@
 import abc
 import argparse
-from typing import List
+from typing import List, get_args, get_origin
 
 from .argument import Argument
+from .utils import get_list_inner_type, is_list
 
 
 class Parser(abc.ABC):
@@ -30,9 +31,22 @@ class ArgparseParser(Parser):
 
     def add_argument(self, arg: Argument):
         annotation = arg.type if arg.type is not None else str
-        self.parser.add_argument(
-            f"--{arg.name}", dest=arg.name, type=annotation, help=arg.help, default=arg.default
-        )
+
+        if is_list(annotation):
+            inner_type = get_list_inner_type(annotation)
+
+            self.parser.add_argument(
+                f"--{arg.name}",
+                dest=arg.name,
+                nargs="+",
+                type=inner_type,
+                help=arg.help,
+                default=arg.default,
+            )
+        else:
+            self.parser.add_argument(
+                f"--{arg.name}", dest=arg.name, type=annotation, help=arg.help, default=arg.default
+            )
 
         # We assume the argument are added in the positional order
         self._signature.append(arg)
@@ -49,13 +63,21 @@ class ArgparseParser(Parser):
             # Check positional arguments
             if value == arg.default:
                 if positional_args:
-                    value = positional_args.pop(0)
-                    kwargs[arg.name] = arg.type(value) if arg.type else value
+                    if is_list(arg.type):
+                        value = positional_args
+                        positional_args = []
+                        kwargs[arg.name] = list(value)
+                    else:
+                        value = positional_args.pop(0)
+                        kwargs[arg.name] = arg.type(value) if arg.type else value
                 elif arg.is_optional:
                     kwargs[arg.name] = arg.default
                 else:
                     self.parser.error(f"Missing required argument: {arg.name}")
             else:
-                kwargs[arg.name] = arg.type(value) if arg.type else value
+                if is_list(arg.type):
+                    kwargs[arg.name] = list(value)
+                else:
+                    kwargs[arg.name] = arg.type(value) if arg.type else value
 
         return kwargs

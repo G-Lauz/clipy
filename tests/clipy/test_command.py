@@ -1,3 +1,4 @@
+from typing import List
 from unittest.mock import patch
 
 import pytest
@@ -146,7 +147,7 @@ def test_command_positional_and_optional_args():
 
 def test_command_list_args():
     @clipy.Command
-    def func(arg1: list, arg2: int):
+    def func(arg1: list[str], arg2: int):
         return arg1, arg2
 
     with patch("sys.argv", ["test.py", "--arg1", "item1", "item2", "--arg2", "42"]):
@@ -154,11 +155,39 @@ def test_command_list_args():
         assert result == (["item1", "item2"], 42)
 
     @clipy.Command
-    def func2(arg1: int, *arg2):
+    def func2(arg1: list, arg2: int):  # Test without subscript
+        return arg1, arg2
+
+    with patch("sys.argv", ["test.py", "--arg1", "item1", "item2", "--arg2", "42"]):
+        result = func2()  # pylint: disable=no-value-for-parameter
+        assert result == (["item1", "item2"], 42)
+
+
+def test_command_typing_list_args():
+    @clipy.Command
+    def func(arg1: List[str], arg2: int):
+        return arg1, arg2
+
+    with patch("sys.argv", ["test.py", "--arg1", "item1", "item2", "--arg2", "42"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == (["item1", "item2"], 42)
+
+    @clipy.Command
+    def func2(arg1: List, arg2: int):  # Test without subscript
+        return arg1, arg2
+
+    with patch("sys.argv", ["test.py", "--arg1", "item1", "item2", "--arg2", "42"]):
+        result = func2()  # pylint: disable=no-value-for-parameter
+        assert result == (["item1", "item2"], 42)
+
+
+def test_command_variable_number_of_args():
+    @clipy.Command
+    def func3(arg1: int, *arg2):
         return arg1, arg2
 
     with patch("sys.argv", ["test.py", "42", "item1", "item2"]):
-        result = func2()  # pylint: disable=no-value-for-parameter
+        result = func3()  # pylint: disable=no-value-for-parameter
         assert result == (42, ("item1", "item2"))
 
 
