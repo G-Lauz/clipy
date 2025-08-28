@@ -1,6 +1,7 @@
 import abc
 import argparse
-from typing import List, get_args, get_origin
+import inspect
+from typing import Dict, List, Tuple
 
 from .argument import Argument
 from .utils import get_list_inner_type, is_list
@@ -14,7 +15,7 @@ class Parser(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def parse_args(self, args=None):
+    def parse_args(self, args=None) -> Tuple[Dict[str, any], List[str], Dict[str, any]]:
         """Parse the command line arguments."""
         pass
 
@@ -26,6 +27,8 @@ class ArgparseParser(Parser):
     def __init__(self):
         self.parser = argparse.ArgumentParser()
         self._signature = []
+
+        self.varargs = None
 
         self.parser.add_argument("positional_args", nargs="*")  # catch-all for positional mapping
 
@@ -43,6 +46,16 @@ class ArgparseParser(Parser):
                 help=arg.help,
                 default=arg.default,
             )
+        elif arg.kind == inspect.Parameter.VAR_POSITIONAL:
+            self.varargs = arg.name
+            self.parser.add_argument(
+                f"--{arg.name}",
+                dest=arg.name,
+                nargs="+",
+                type=annotation,  # Default to str
+                help=arg.help,
+                default=arg.default,
+            )
         else:
             self.parser.add_argument(
                 f"--{arg.name}", dest=arg.name, type=annotation, help=arg.help, default=arg.default
@@ -51,13 +64,16 @@ class ArgparseParser(Parser):
         # We assume the argument are added in the positional order
         self._signature.append(arg)
 
-    def parse_args(self):
+    def parse_args(self) -> Tuple[Dict[str, any], List[str], Dict[str, any]]:
         parsed_args = self.parser.parse_args()
         positional_args = parsed_args.positional_args[:]
 
         kwargs = {}
         for arg in self._signature:
             value = getattr(parsed_args, arg.name)
+
+            if arg.name == self.varargs:
+                continue  # ignore varargs for the moment
 
             # Argument not provide as named argument (--name)
             # Check positional arguments
@@ -80,4 +96,9 @@ class ArgparseParser(Parser):
                 else:
                     kwargs[arg.name] = arg.type(value) if arg.type else value
 
-        return kwargs
+        if self.varargs:
+            value = getattr(parsed_args, self.varargs)
+            if value is not None and value is not inspect.Parameter.empty:
+                positional_args.extend(list(value))
+
+        return kwargs, positional_args, None

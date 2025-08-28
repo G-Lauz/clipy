@@ -22,6 +22,7 @@ class Command(abc.ABC):
         self.parser = None
 
         self.args = {}
+        self.varargs = None
 
         self.func = func
 
@@ -36,10 +37,18 @@ class Command(abc.ABC):
             self._init_command()
             return self
 
-        parsed_args = self.parser.parse_args()
+        parsed_args, positional_args, _ = self.parser.parse_args()
         self._check_for_empty_args(parsed_args)
 
-        binding = self.signature.bind(**parsed_args)
+        # order parsed_args according to signature order then add positional_args
+        ordered_args = []
+        for name in self.signature.parameters.keys():
+            if name in parsed_args:
+                ordered_args.append(parsed_args[name])
+
+        ordered_args.extend(positional_args)
+
+        binding = self.signature.bind(*ordered_args)
         binding.apply_defaults()
         return self.func(*binding.args, **binding.kwargs)
 
@@ -59,8 +68,16 @@ class Command(abc.ABC):
             )
 
             arg = Argument(
-                name=name, type=annotation, default=param.default, help=args_help.get(name)
+                name=name,
+                type=annotation,
+                default=param.default,
+                help=args_help.get(name),
+                kind=param.kind,
             )
+
+            if arg.kind == inspect.Parameter.VAR_POSITIONAL:
+                self.varargs = arg
+
             self.args[name] = arg
 
         # Build the parser

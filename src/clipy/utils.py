@@ -1,4 +1,4 @@
-from typing import List, get_args, get_origin
+from typing import get_args, get_origin
 
 
 def is_list(annotations: type) -> bool:

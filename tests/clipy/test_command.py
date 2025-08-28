@@ -183,11 +183,23 @@ def test_command_typing_list_args():
 
 def test_command_variable_number_of_args():
     @clipy.Command
-    def func3(arg1: int, *arg2):
+    def func(arg1: int, *arg2):
         return arg1, arg2
 
     with patch("sys.argv", ["test.py", "42", "item1", "item2"]):
-        result = func3()  # pylint: disable=no-value-for-parameter
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == (42, ("item1", "item2"))
+
+    with patch("sys.argv", ["test.py", "42", "--arg2", "item1", "item2"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == (42, ("item1", "item2"))
+
+    with patch("sys.argv", ["test.py", "--arg1", "42", "--arg2", "item1", "item2"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == (42, ("item1", "item2"))
+
+    with patch("sys.argv", ["test.py", "--arg1", "42", "item1", "item2"]):
+        result = func()  # pylint: disable=no-value-for-parameter
         assert result == (42, ("item1", "item2"))
 
 
@@ -200,10 +212,12 @@ def test_command_dict_args():
         result = func()  # pylint: disable=no-value-for-parameter
         assert result == ({"key1": "value1", "key2": "value2"}, 42)
 
+
+def test_command_variable_number_of_kwargs():
     @clipy.Command
-    def func2(arg1: int, **arg2):
+    def func(arg1: int, **arg2):
         return arg1, arg2
 
     with patch("sys.argv", ["test.py", "42", "--key1", "value1", "--key2", "value2"]):
-        result = func2()  # pylint: disable=no-value-for-parameter
+        result = func()  # pylint: disable=no-value-for-parameter
         assert result == (42, {"key1": "value1", "key2": "value2"})

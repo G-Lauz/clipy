@@ -8,6 +8,7 @@ class Argument:
     type: type
     default: any
     help: str
+    kind: inspect._ParameterKind
 
     @property
     def is_required(self):
