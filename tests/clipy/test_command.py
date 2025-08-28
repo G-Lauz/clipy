@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 from unittest.mock import patch
 
 import pytest
@@ -208,8 +208,62 @@ def test_command_dict_args():
     def func(arg1: dict, arg2: int):
         return arg1, arg2
 
-    with patch("sys.argv", ["test.py", "--arg1", "key1=value1", "key2=value2", "--arg2", "42"]):
+    with patch(
+        "sys.argv", ["test.py", "--arg1", "key1=value1", "--arg1", "key2=value2", "--arg2", "42"]
+    ):
         result = func()  # pylint: disable=no-value-for-parameter
+        assert result == ({"key1": "value1", "key2": "value2"}, 42)
+
+    with patch("sys.argv", ["test.py", "key1=value1", "key2=value2", "--arg2", "42"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == ({"key1": "value1", "key2": "value2"}, 42)
+
+    @clipy.Command
+    def func2(arg1: dict[str, str], arg2: int):  # Test with subscripts
+        return arg1, arg2
+
+    with patch(
+        "sys.argv", ["test.py", "--arg1", "key1=value1", "--arg1", "key2=value2", "--arg2", "42"]
+    ):
+        result = func2()  # pylint: disable=no-value-for-parameter
+        assert result == ({"key1": "value1", "key2": "value2"}, 42)
+
+    @clipy.Command
+    def func3(arg1: dict[str, int], arg2: int):
+        return arg1, arg2
+
+    with patch("sys.argv", ["test.py", "--arg1", "key1=1", "--arg1", "key2=2", "--arg2", "42"]):
+        result = func3()  # pylint: disable=no-value-for-parameter
+        assert result == ({"key1": 1, "key2": 2}, 42)
+
+
+def test_command_typing_dict_args():
+    @clipy.Command
+    def func(arg1: Dict[str, str], arg2: int):
+        return arg1, arg2
+
+    with patch(
+        "sys.argv", ["test.py", "--arg1", "key1=value1", "--arg1", "key2=value2", "--arg2", "42"]
+    ):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == ({"key1": "value1", "key2": "value2"}, 42)
+
+    @clipy.Command
+    def func2(arg1: Dict[str, int], arg2: int):  # Test with different value type
+        return arg1, arg2
+
+    with patch("sys.argv", ["test.py", "--arg1", "key1=1", "--arg1", "key2=2", "--arg2", "42"]):
+        result = func2()  # pylint: disable=no-value-for-parameter
+        assert result == ({"key1": 1, "key2": 2}, 42)
+
+    @clipy.Command
+    def func3(arg1: Dict, arg2: int):
+        return arg1, arg2
+
+    with patch(
+        "sys.argv", ["test.py", "--arg1", "key1=value1", "--arg1", "key2=value2", "--arg2", "42"]
+    ):
+        result = func3()  # pylint: disable=no-value-for-parameter
         assert result == ({"key1": "value1", "key2": "value2"}, 42)
 
 

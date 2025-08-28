@@ -34,3 +34,6 @@ exclude = '''
   |Dockerfile
 )/
 '''
+
+[tool.isort]
+profile = "black"
