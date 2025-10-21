@@ -1,25 +1,4 @@
-import sys
-from typing import List
-
-from clipy.ast.parser import Parser
-from clipy.ast.tokenizer import Tokenizer
 from clipy.command import Command
-
-
-def pretty_print(node: "CommandNode", indent: int = 0):
-    from clipy.ast import ArgumentNode, CommandNode
-
-    node_name = None
-    if isinstance(node, CommandNode):
-        node_name = "Command: " + node.cmd_instance.name
-    elif isinstance(node, ArgumentNode):
-        node_name = "Argument: " + node.arg_instance.name
-
-    print("    " * indent + node_name)
-
-    if isinstance(node, CommandNode):
-        for child in node.children:
-            pretty_print(child, indent + 1)
 
 
 @Command
@@ -49,26 +28,12 @@ class NestedCommand(Command):
         print(f"cmd2 executed with {arg}")
 
 
-@Command(name="named_cmd")
-def func(arg1: int, **arg2):
-    return arg1, arg2
+class MainCommand(Command):
+    @Command
+    def subcmd(self, arg1: dict[str, int], arg2: int):
+        print(f"subcmd executed with arg1={arg1} and arg2={arg2}")
 
 
 if __name__ == "__main__":
-    # toeknizer = Tokenizer(sys.argv[1:])
-    # tokens = toeknizer.get_tokens()
-    # for token in tokens:
-    #     print(token)
-
-    # parser = Parser(NestedCommand(), sys.argv[1:])
-    # ast_root = parser.parse()
-
-    # pretty_print(ast_root)
-
-    # cmd = NestedCommand()
-    # cmd()
-
-    # greeting()
-
-    result = func()
-    print(f"func returned: {result}")
+    cmd = MainCommand()
+    cmd()

@@ -38,10 +38,6 @@ class Parser:
         while self.current_token is None or self.current_token.type != TokenType.END:
             token = self._get_next_token()
 
-            print(
-                f"Processing token: {token.type} ({token.value}) for command {command_node.cmd_instance.name}"
-            )
-
             if token.type in [TokenType.LONG_OPT, TokenType.SHORT_OPT]:
                 self._handle_option(token, command_node)
                 args_parsed += 1
@@ -155,7 +151,10 @@ class Parser:
 
         # Check if the option exists in the command
         opt_name = token.value.lstrip("-")
-        argument = command_node.cmd_instance.args.get(opt_name, None)
+        argument = None
+        if command_node.cmd_instance.args is not None:
+            argument = command_node.cmd_instance.args.get(opt_name, None)
+
         if argument is None and not has_varkwargs_argument:
             raise ValueError(
                 f"Unknown option: {token.value} for command {command_node.cmd_instance.name}"
@@ -163,10 +162,11 @@ class Parser:
 
         if argument is None:  # This means we have a **kwargs argument to capture unknown options
             # select the **kwargs argument
-            for arg in command_node.cmd_instance.args.values():
-                if arg.kind == inspect.Parameter.VAR_KEYWORD:
-                    argument = arg
-                    break
+            if command_node.cmd_instance.args is not None:
+                for arg in command_node.cmd_instance.args.values():
+                    if arg.kind == inspect.Parameter.VAR_KEYWORD:
+                        argument = arg
+                        break
 
         if is_list(argument.type) or argument.kind == inspect.Parameter.VAR_POSITIONAL:
             inner_type = get_list_inner_type(argument.type)

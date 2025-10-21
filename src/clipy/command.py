@@ -21,16 +21,17 @@ class Command:
     subcommands: Dict[str, "Command"]
 
     def __init__(self, func: Callable = None, *, name: str = None):
-        # If func is None, we're being used as @Command(name="...") and need to return a decorator
+        # If func is None AND we're being called directly on Command class (not a subclass),
+        # we're being used as @Command(name="...") and need to return a decorator
         self._deferred_init = False
-        if func is None:
+        if func is None and self.__class__ == Command:
             self._deferred_init = True
             self._pending_name = name
             return
 
         self.name = name
         if name is None and self.name is None:
-            self.name = func.__name__ if func is not None else self.__class__.__name__
+            self.name = func.__name__ if func is not None else self.__class__.__name__.lower()
 
         self.func = func
 
@@ -38,9 +39,10 @@ class Command:
         if self.func is None:
             self.is_group = True
 
+        self.signature = None
         self.args = self.get_args()
         self.subcommands = self.get_subcommands()
-        self.usage = self._get_usage(self.signature.parameters)
+        self.usage = self._get_usage()
 
     def __call__(self, *args, **kwargs):
         # If we're in deferred init mode, the first call receives the function
@@ -48,24 +50,12 @@ class Command:
             func = args[0]
             return Command(func, name=self._pending_name)
 
-        print(f"{self.name} is being called.")
-
-        cmd_tree = self.build_command_tree()
-        print("Command Tree:")
-        print(cmd_tree)
-
         argv = sys.argv[1:]  # get command line arguments excluding script name
         parser = Parser(self, argv)
         ast_root = parser.parse()
 
         visitor = CommandExecutor()
         return ast_root.accept(visitor)
-
-        # if self.func is not None:
-        #     return self.func(*args, **kwargs)
-
-        # print("The function doesn't exist, most probably because its a group.")
-        # return None
 
     def get_args(self) -> Dict[str, Argument]:
         # If it's a group there is no need to set description and signature yet
@@ -124,17 +114,31 @@ class Command:
                 tree_str += subcmd.build_command_tree(level + 1)
         return tree_str
 
-    def _get_usage(self, parameters: Dict[str, inspect.Parameter]) -> str:
+    def _get_usage(self) -> str:
         usage_parts = [self.name]
 
-        for name, param in parameters.items():
-            # Get the type name from annotation
-            if param.annotation is not inspect.Parameter.empty:
-                type_name = param.annotation.__name__
-            else:
-                type_name = "str"  # default type
+        if not self.is_group:
+            parameters: Dict[str, inspect.Parameter] = self.signature.parameters
 
-            # All parameters are optional (wrapped in [])
-            usage_parts.append(f"[--{name} <{type_name}>]")
+            for name, param in parameters.items():
+                if name in ("self", "cls"):
+                    continue
+
+                # Get the type name from annotation
+                if param.annotation is not inspect.Parameter.empty:
+                    type_name = param.annotation.__name__
+                else:
+                    type_name = "str"  # default type
+
+                # All parameters are optional (wrapped in [])
+                usage_parts.append(f"[--{name} <{type_name}>]")
+
+        else:
+            possible_cmd_str = ["{"]
+            for subcmd_name in self.subcommands.keys():
+                possible_cmd_str.append(f"{subcmd_name},")
+            possible_cmd_str[-1] = possible_cmd_str[-1][:-1]  # Remove trailing comma
+            possible_cmd_str.append("}")
+            usage_parts.append(" ".join(possible_cmd_str))
 
         return " ".join(usage_parts)

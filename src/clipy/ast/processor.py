@@ -28,15 +28,15 @@ class CommandExecutor(ASTProcessor):
     """
 
     def process_command(self, node: CommandNode):
-        print(f"Executing command: {node.cmd_instance.name}")
-
         parsed_args: Dict[str, ArgumentNode] = {}
         positional_args = []
         kwargs = {}
 
+        subcommand_return = None
+
         for child in node.children:
             if isinstance(child, CommandNode):
-                child.accept(self)
+                subcommand_return = child.accept(self)
             elif isinstance(child, ArgumentNode):
                 if child.arg_instance.kind == inspect.Parameter.VAR_POSITIONAL:
                     if isinstance(child.value, list):
@@ -50,14 +50,11 @@ class CommandExecutor(ASTProcessor):
                 else:
                     parsed_args[child.arg_instance.name] = child.value
 
-        print(parsed_args)
-        print(positional_args)
-        print(kwargs)
-
         ordered_args = []
-        for name in node.cmd_instance.signature.parameters.keys():
-            if name in parsed_args:
-                ordered_args.append(parsed_args[name])
+        if node.cmd_instance.signature is not None:
+            for name in node.cmd_instance.signature.parameters.keys():
+                if name in parsed_args:
+                    ordered_args.append(parsed_args[name])
         ordered_args.extend(positional_args)
 
         if not node.cmd_instance.is_group:
@@ -78,5 +75,7 @@ class CommandExecutor(ASTProcessor):
             binding.apply_defaults()
             return func(*binding.args, **binding.kwargs)
 
+        return subcommand_return
+
     def process_argument(self, node: ArgumentNode):
-        print(f"Processing argument with value: {node.value}")
+        raise NotImplementedError("Argument processing is not implemented.")
