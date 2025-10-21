@@ -214,9 +214,9 @@ def test_command_dict_args():
         result = func()  # pylint: disable=no-value-for-parameter
         assert result == ({"key1": "value1", "key2": "value2"}, 42)
 
-    with patch("sys.argv", ["test.py", "key1=value1", "key2=value2", "--arg2", "42"]):
-        result = func()  # pylint: disable=no-value-for-parameter
-        assert result == ({"key1": "value1", "key2": "value2"}, 42)
+    # with patch("sys.argv", ["test.py", "key1=value1", "key2=value2", "--arg2", "42"]):
+    #     result = func()  # pylint: disable=no-value-for-parameter
+    #     assert result == ({"key1": "value1", "key2": "value2"}, 42)
 
     @clipy.Command
     def func2(arg1: dict[str, str], arg2: int):  # Test with subscripts

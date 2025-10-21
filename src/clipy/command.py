@@ -1,107 +1,128 @@
-import abc
+from __future__ import annotations
+
 import inspect
-import pathlib
 import sys
-from typing import Dict
+from typing import Callable, Dict
 
 from .argument import Argument
+from .ast.parser import Parser
+from .ast.processor import CommandExecutor
 from .docstring_parser import GoogleStyleDocstringParser
-from .parser import ArgparseParser
 
 
-class Command(abc.ABC):
+class Command:
+    name: str = None
+    description: str = None
+
+    func: Callable
+    is_group: bool
 
     args: Dict[str, Argument]
+    subcommands: Dict[str, "Command"]
 
-    def __init__(self, func=None, *, name=None):
-        self.name = self._get_name(name)
+    def __init__(self, func: Callable = None, *, name: str = None):
+        # If func is None, we're being used as @Command(name="...") and need to return a decorator
+        self._deferred_init = False
+        if func is None:
+            self._deferred_init = True
+            self._pending_name = name
+            return
 
-        self.signature = None
-        self.usage = None
-        self.description = None
-        self.parser = None
-
-        self.args = {}
-        self.varargs = None
+        self.name = name
+        if name is None and self.name is None:
+            self.name = func.__name__ if func is not None else self.__class__.__name__
 
         self.func = func
 
-        if func is None:
-            return  # The decorator has been called with arguments, not a function
-
-        self._init_command()
-
-    def __call__(self, func=None):
+        self.is_group = False
         if self.func is None:
-            self.func = func
-            self._init_command()
-            return self
+            self.is_group = True
 
-        parsed_args, positional_args, _ = self.parser.parse_args()
-        self._check_for_empty_args(parsed_args)
+        self.args = self.get_args()
+        self.subcommands = self.get_subcommands()
+        self.usage = self._get_usage(self.signature.parameters)
 
-        # order parsed_args according to signature order then add positional_args
-        ordered_args = []
-        for name in self.signature.parameters.keys():
-            if name in parsed_args:
-                ordered_args.append(parsed_args[name])
+    def __call__(self, *args, **kwargs):
+        # If we're in deferred init mode, the first call receives the function
+        if self._deferred_init:
+            func = args[0]
+            return Command(func, name=self._pending_name)
 
-        ordered_args.extend(positional_args)
+        print(f"{self.name} is being called.")
 
-        binding = self.signature.bind(*ordered_args)
-        binding.apply_defaults()
-        return self.func(*binding.args, **binding.kwargs)
+        cmd_tree = self.build_command_tree()
+        print("Command Tree:")
+        print(cmd_tree)
 
-    def _init_command(self):
+        argv = sys.argv[1:]  # get command line arguments excluding script name
+        parser = Parser(self, argv)
+        ast_root = parser.parse()
+
+        visitor = CommandExecutor()
+        return ast_root.accept(visitor)
+
+        # if self.func is not None:
+        #     return self.func(*args, **kwargs)
+
+        # print("The function doesn't exist, most probably because its a group.")
+        # return None
+
+    def get_args(self) -> Dict[str, Argument]:
+        # If it's a group there is no need to set description and signature yet
+        if self.is_group:
+            return None
+
         self.description = self.func.__doc__.strip() if self.func.__doc__ else None
         args_help = GoogleStyleDocstringParser().parse(self.description) if self.description else {}
 
         self.signature = inspect.signature(self.func)
         parameters = self.signature.parameters
 
-        self.usage = self._get_usage(parameters)
-
-        # Build the list of Arguments
+        # Build the list of arguments
+        args = {}
         for name, param in parameters.items():
+            # TODO: better handling of 'self' and 'cls'
+            if name in ("self", "cls"):
+                continue
+
             annotation = (
                 param.annotation if param.annotation is not inspect.Parameter.empty else None
             )
 
-            arg = Argument(
+            argument = Argument(
                 name=name,
                 type=annotation,
                 default=param.default,
-                help=args_help.get(name),
+                help=args_help.get(name, "No description available."),
                 kind=param.kind,
             )
+            args[name] = argument
 
-            if arg.kind == inspect.Parameter.VAR_POSITIONAL:
-                self.varargs = arg
+        return args
 
-            self.args[name] = arg
+    def get_subcommands(self) -> Dict[str, "Command"]:
+        if not self.is_group:
+            return None
 
-        # Build the parser
-        self.parser = ArgparseParser()
-        for arg in self.args.values():
-            self.parser.add_argument(arg)
+        # get class members
+        cls_members = dir(self)
 
-    def _check_for_empty_args(self, parsed_args):
-        missing_args = []
-        for arg, value in parsed_args.items():
-            if value is inspect.Parameter.empty:
-                missing_args.append(arg)
+        subcommands = {}
 
-        if missing_args:
-            print(f"Missing required arguments: {', '.join(missing_args)}")
-            print(f"usage: {self.usage}")
-            sys.exit(1)
+        for member in cls_members:
+            obj = getattr(self, member)
+            if isinstance(obj, Command):
+                subcommands[member] = obj
 
-    def _get_name(self, name=None):
-        if name:
-            return name
+        return subcommands
 
-        script = pathlib.Path(sys.argv[0])
-        return script.stem
+    def build_command_tree(self, level=0):
+        indent = "  " * level
+        tree_str = f"{indent}- {self.name}\n"
+        if self.is_group:
+            for subcmd_name, subcmd in self.subcommands.items():
+                tree_str += subcmd.build_command_tree(level + 1)
+        return tree_str
 
     def _get_usage(self, parameters: Dict[str, inspect.Parameter]) -> str:
         usage_parts = [self.name]
