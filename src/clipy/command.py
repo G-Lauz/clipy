@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import inspect
 import sys
-from typing import Callable, Dict
+from typing import Callable, Dict, List
 
 from .argument import Argument
+from .ast.error import ParseError
 from .ast.parser import Parser
 from .ast.processor import CommandExecutor
 from .docstring_parser import GoogleStyleDocstringParser
@@ -50,9 +51,12 @@ class Command:
             func = args[0]
             return Command(func, name=self._pending_name)
 
-        argv = sys.argv[1:]  # get command line arguments excluding script name
-        parser = Parser(self, argv)
-        ast_root = parser.parse()
+        try:
+            argv = sys.argv[1:]  # get command line arguments excluding script name
+            parser = Parser(self, argv)
+            ast_root = parser.parse()
+        except ParseError as error:
+            self._handle_parsing_error(error, argv)
 
         visitor = CommandExecutor()
         return ast_root.accept(visitor)
@@ -142,3 +146,21 @@ class Command:
             usage_parts.append(" ".join(possible_cmd_str))
 
         return " ".join(usage_parts)
+
+    def _handle_parsing_error(self, error: ParseError, argv: List[str]):
+        token = error.token.value if error.token else None
+
+        print("Usage:")
+        print(f"  {self._get_usage()}")
+        print()
+
+        if token:
+            joined_argv = " ".join([self.name] + argv)
+            token_position = joined_argv.find(token)
+            if token_position != -1:
+                underline = " " * token_position + "^" * len(token)
+                print(joined_argv)
+                print(underline)
+
+        print(f"Error: {error.message}")
+        sys.exit(1)

@@ -4,6 +4,15 @@ import inspect
 from typing import TYPE_CHECKING, List
 
 from ..utils import get_dict_key_value_types, get_list_inner_type, is_dict, is_list
+from .error import (
+    MissingRequiredArgumentError,
+    MissingRequiredValueError,
+    TooManyArgumentsError,
+    UnexpectedPositionalArgumentError,
+    UnexpectedValueFormatError,
+    UnknownArgumentError,
+    UnknownTokenTypeError,
+)
 from .nodes import ArgumentNode, CommandNode
 from .tokenizer import Token, Tokenizer, TokenType
 
@@ -68,9 +77,7 @@ class Parser:
 
                 # It's an argument for the current command
                 if command_node.cmd_instance.args is None:
-                    raise ValueError(
-                        f"Unexpected positional argument: {token.value} for command {command_node.cmd_instance.name}"
-                    )
+                    raise UnexpectedPositionalArgumentError(token)
 
                 # check if an argument is a var-positional
                 has_varargs_argument = command_node.cmd_instance.args and any(
@@ -79,9 +86,7 @@ class Parser:
                 )
 
                 if args_parsed >= num_args and not has_varargs_argument:
-                    raise ValueError(
-                        f"Too many arguments provided for command {command_node.cmd_instance.name}"
-                    )
+                    raise TooManyArgumentsError()
 
                 # Get the next expected argument
                 arg_names = list(command_node.cmd_instance.args.keys())
@@ -94,9 +99,7 @@ class Parser:
                 argument = command_node.cmd_instance.args.get(arg_name)
 
                 if argument is None:
-                    raise ValueError(
-                        f"Unexpected positional argument: {token.value} for command {command_node.cmd_instance.name}"
-                    )
+                    raise UnexpectedPositionalArgumentError(token)
 
                 if argument.kind == inspect.Parameter.VAR_POSITIONAL:
                     values = [argument.type(token.value) if argument.type else token.value]
@@ -136,7 +139,7 @@ class Parser:
 
             else:
                 # Unexpected token type
-                raise ValueError(f"Unexpected token type: {token.type}")
+                raise UnknownTokenTypeError(token)
 
         self.check_expected_args(command_node)
         return command_node
@@ -156,9 +159,7 @@ class Parser:
             argument = command_node.cmd_instance.args.get(opt_name, None)
 
         if argument is None and not has_varkwargs_argument:
-            raise ValueError(
-                f"Unknown option: {token.value} for command {command_node.cmd_instance.name}"
-            )
+            raise UnknownArgumentError(token)
 
         if argument is None:  # This means we have a **kwargs argument to capture unknown options
             # select the **kwargs argument
@@ -204,13 +205,11 @@ class Parser:
 
             value_token = self._get_next_token()
             if value_token.type != TokenType.VALUE:
-                raise ValueError(f"Option {token.value} requires a value")
+                raise MissingRequiredValueError(value_token)
 
             # Expect key=value format
             if "=" not in value_token.value:
-                raise ValueError(
-                    f"Expected key=value format for dict argument {argument.name}, got: {value_token.value}"
-                )
+                raise UnexpectedValueFormatError("key=value", value_token)
 
             key_str, val_str = value_token.value.split("=", 1)
 
@@ -237,7 +236,7 @@ class Parser:
 
             value_token = self._get_next_token()
             if value_token.type != TokenType.VALUE:
-                raise ValueError(f"Option {token.value} requires a value")
+                raise MissingRequiredValueError(value_token)
 
             # Assume the **kwargs dictionnary to be of type dict[str, Any]
             value = argument.type(value_token.value) if argument.type else value_token.value
@@ -252,7 +251,7 @@ class Parser:
             # Expected the next token to be a value
             value_token = self._get_next_token()
             if value_token.type != TokenType.VALUE:
-                raise ValueError(f"Option {token.value} requires a value")
+                raise MissingRequiredValueError(value_token)
 
             # Cast the value to the appropriate type
             value = argument.type(value_token.value) if argument.type else value_token.value
@@ -288,4 +287,4 @@ class Parser:
 
         missing_args = expected_args - provided_args
         if missing_args:
-            raise ValueError(f"Missing required arguments: {', '.join(missing_args)}")
+            raise MissingRequiredArgumentError(missing_args)
