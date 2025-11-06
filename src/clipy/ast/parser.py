@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, List
 
 from ..utils import get_dict_key_value_types, get_list_inner_type, is_dict, is_list
 from .error import (
+    InvalidArgumentTypeError,
     MissingRequiredArgumentError,
     MissingRequiredValueError,
     TooManyArgumentsError,
@@ -102,7 +103,12 @@ class Parser:
                     raise UnexpectedPositionalArgumentError(token)
 
                 if argument.kind == inspect.Parameter.VAR_POSITIONAL:
-                    values = [argument.type(token.value) if argument.type else token.value]
+                    try:
+                        values = [argument.type(token.value) if argument.type else token.value]
+                    except (ValueError, TypeError) as error:
+                        raise InvalidArgumentTypeError(
+                            argument.type.__name__ if argument.type else "str", token
+                        ) from error
 
                     token_is_part_of_the_list = True
                     while token_is_part_of_the_list:
@@ -117,11 +123,16 @@ class Parser:
                             self.tokenizer.push_back(value_token)
                         else:
                             # Cast the value to the appropriate inner type
-                            value = (
-                                argument.type(value_token.value)
-                                if argument.type
-                                else value_token.value
-                            )
+                            try:
+                                value = (
+                                    argument.type(value_token.value)
+                                    if argument.type
+                                    else value_token.value
+                                )
+                            except (ValueError, TypeError) as error:
+                                raise InvalidArgumentTypeError(
+                                    argument.type.__name__ if argument.type else "str", value_token
+                                ) from error
                             values.append(value)
 
                     option_node = ArgumentNode(argument, values)
@@ -129,7 +140,12 @@ class Parser:
 
                 else:
                     # Cast the value to the appropriate type
-                    value = argument.type(token.value) if argument.type else token.value
+                    try:
+                        value = argument.type(token.value) if argument.type else token.value
+                    except (ValueError, TypeError) as error:
+                        raise InvalidArgumentTypeError(
+                            argument.type.__name__ if argument.type else "str", token
+                        ) from error
                     argument_node = ArgumentNode(argument, value)
                     command_node.add_child(argument_node)
                     args_parsed += 1
@@ -215,7 +231,13 @@ class Parser:
 
             # Cast key and value to appropriate types
             key = key_type(key_str) if key_type else key_str
-            val = value_type(val_str) if value_type else val_str
+            try:
+                val = value_type(val_str) if value_type else val_str
+            except (ValueError, TypeError) as error:
+                raise InvalidArgumentTypeError(
+                    value_type.__name__ if value_type else "str", value_token
+                ) from error
+
             dict_value[key] = val
 
             if existing_node:
@@ -239,7 +261,12 @@ class Parser:
                 raise MissingRequiredValueError(value_token)
 
             # Assume the **kwargs dictionnary to be of type dict[str, Any]
-            value = argument.type(value_token.value) if argument.type else value_token.value
+            try:
+                value = argument.type(value_token.value) if argument.type else value_token.value
+            except (ValueError, TypeError) as error:
+                raise InvalidArgumentTypeError(
+                    argument.type.__name__ if argument.type else "str", value_token
+                ) from error
 
             if existing_node:
                 existing_node.value[opt_name] = value
@@ -254,7 +281,12 @@ class Parser:
                 raise MissingRequiredValueError(value_token)
 
             # Cast the value to the appropriate type
-            value = argument.type(value_token.value) if argument.type else value_token.value
+            try:
+                value = argument.type(value_token.value) if argument.type else value_token.value
+            except (ValueError, TypeError) as error:
+                raise InvalidArgumentTypeError(
+                    argument.type.__name__ if argument.type else "str", value_token
+                ) from error
 
             option_node = ArgumentNode(argument, value)
             command_node.add_child(option_node)

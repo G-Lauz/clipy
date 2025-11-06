@@ -58,6 +58,14 @@ class UnexpectedValueFormatError(ParseError):
         super().__init__(message, token)
 
 
+class InvalidArgumentTypeError(ParseError):
+    """Exception raised for invalid argument types."""
+
+    def __init__(self, expected_type: str, token: Token) -> None:
+        message = f"Expected argument of type: {expected_type}, but got: {token.value}"
+        super().__init__(message, token)
+
+
 # Internal error
 class UnknownTokenTypeError(ParseError):
     """Exception raised for unexpected token types."""
