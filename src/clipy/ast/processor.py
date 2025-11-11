@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 import inspect
-from typing import Dict
+from typing import Any, Dict, List, Tuple
 
 from .nodes import ArgumentNode, CommandNode
 
@@ -32,11 +32,14 @@ class CommandExecutor(ASTProcessor):
         positional_args = []
         kwargs = {}
 
-        subcommand_return = None
+        # subcommand_return = None
+        help_flag = False
+        subcommand_path: List[Tuple[CommandNode, Any]] = []
 
         for child in node.children:
             if isinstance(child, CommandNode):
-                subcommand_return = child.accept(self)
+                path, help_flag = child.accept(self)
+                subcommand_path.extend(path)
             elif isinstance(child, ArgumentNode):
                 if child.arg_instance.kind == inspect.Parameter.VAR_POSITIONAL:
                     if isinstance(child.value, list):
@@ -57,6 +60,12 @@ class CommandExecutor(ASTProcessor):
                     ordered_args.append(parsed_args[name])
         ordered_args.extend(positional_args)
 
+        # Check for help flag
+        if "help" in parsed_args and parsed_args["help"]:
+            help_flag = True
+            subcommand_path.append((node.cmd_instance, None))
+            return subcommand_path, help_flag
+
         if not node.cmd_instance.is_group:
 
             # Check if it's a bound method (with self or cls)
@@ -73,9 +82,13 @@ class CommandExecutor(ASTProcessor):
 
             binding = signature.bind(*ordered_args, **kwargs)
             binding.apply_defaults()
-            return func(*binding.args, **binding.kwargs)
+            return_value = func(*binding.args, **binding.kwargs)
 
-        return subcommand_return
+            subcommand_path.append((node.cmd_instance, return_value))
+            return subcommand_path, help_flag
+
+        subcommand_path.append((node.cmd_instance, None))
+        return subcommand_path, help_flag
 
     def process_argument(self, node: ArgumentNode):
         raise NotImplementedError("Argument processing is not implemented.")

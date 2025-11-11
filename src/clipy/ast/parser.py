@@ -8,6 +8,7 @@ from .error import (
     InvalidArgumentTypeError,
     MissingRequiredArgumentError,
     MissingRequiredValueError,
+    ParseError,
     TooManyArgumentsError,
     UnexpectedPositionalArgumentError,
     UnexpectedValueFormatError,
@@ -30,6 +31,8 @@ class Parser:
 
         self.current_token = None
 
+        self.command_tree: List[Command] = []
+
     def _get_next_token(self):
         self.current_token = self.tokenizer.next()
         return self.current_token
@@ -37,7 +40,14 @@ class Parser:
     def parse(self) -> CommandNode:
         self.tokenizer.reset()
 
-        return self._recursive_parse(self.root)
+        try:
+            command_node = self._recursive_parse(self.root)
+        except ParseError as error:
+            raise error from error
+        finally:
+            self.command_tree.append(self.root)
+
+        return command_node
 
     def _recursive_parse(self, command: Command) -> CommandNode:
         command_node = CommandNode(command)
@@ -68,9 +78,15 @@ class Parser:
                     sub_cmd = command_node.cmd_instance.subcommands.get(token.value, None)
                     if sub_cmd:
                         # Found a subcommand, create a new CommandNode and recurse
-                        subcommand_node = self._recursive_parse(sub_cmd)
-                        command_node.add_child(subcommand_node)
-                        found_command = True
+                        try:
+                            subcommand_node = self._recursive_parse(sub_cmd)
+                            command_node.add_child(subcommand_node)
+                            found_command = True
+                        except ParseError as error:
+                            raise error from error
+                        finally:
+                            self.command_tree.append(sub_cmd)
+
                         return command_node
 
                 if found_command:
@@ -318,5 +334,6 @@ class Parser:
                 expected_args.add(arg_name)
 
         missing_args = expected_args - provided_args
-        if missing_args:
+        missing_args = missing_args - {"help"}
+        if missing_args and "help" not in provided_args:
             raise MissingRequiredArgumentError(missing_args)

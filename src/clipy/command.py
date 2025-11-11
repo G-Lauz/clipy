@@ -30,6 +30,9 @@ class Command:
             self._pending_name = name
             return
 
+        self.id = hash(self)
+
+        self.enforce_name = name is not None
         self.name = name
         if name is None and self.name is None:
             self.name = func.__name__ if func is not None else self.__class__.__name__.lower()
@@ -56,24 +59,44 @@ class Command:
             parser = Parser(self, argv)
             ast_root = parser.parse()
         except ParseError as error:
-            self._handle_parsing_error(error, argv)
+            self._handle_parsing_error(error, argv, parser.command_tree)
 
         visitor = CommandExecutor()
-        return ast_root.accept(visitor)
+        command_path, help_flag = ast_root.accept(visitor)
+
+        if help_flag:
+            # The first command in the path is the one we want help for
+            last_command_node = command_path[0][0] if command_path else ast_root
+            print(last_command_node.get_help(command_path=[cmd for cmd, _ in command_path]))
+            sys.exit(0)
+
+        return command_path[0][1] if command_path else None
 
     def get_args(self) -> Dict[str, Argument]:
+        args = {}
+
+        # add help argument
+        help_argument = Argument(
+            name="help",
+            type=bool,
+            help="Show this help message and exit.",
+            kind=inspect.Parameter.KEYWORD_ONLY,
+        )
+
         # If it's a group there is no need to set description and signature yet
         if self.is_group:
-            return None
+            args["help"] = help_argument
+            return args
 
-        self.description = self.func.__doc__.strip() if self.func.__doc__ else None
-        args_help = GoogleStyleDocstringParser().parse(self.description) if self.description else {}
+        docstring = self.func.__doc__.strip() if self.func.__doc__ else None
+        args_help, self.description = (
+            GoogleStyleDocstringParser().parse(docstring) if docstring else ({}, "")
+        )
 
         self.signature = inspect.signature(self.func)
         parameters = self.signature.parameters
 
         # Build the list of arguments
-        args = {}
         for name, param in parameters.items():
             # TODO: better handling of 'self' and 'cls'
             if name in ("self", "cls"):
@@ -92,6 +115,7 @@ class Command:
             )
             args[name] = argument
 
+        args["help"] = help_argument  # Should be the last argument
         return args
 
     def get_subcommands(self) -> Dict[str, "Command"]:
@@ -106,6 +130,9 @@ class Command:
         for member in cls_members:
             obj = getattr(self, member)
             if isinstance(obj, Command):
+                # Override the default class name of an attribute command with the attribute name
+                obj.name = member if not obj.enforce_name else obj.name
+
                 subcommands[member] = obj
 
         return subcommands
@@ -118,11 +145,16 @@ class Command:
                 tree_str += subcmd.build_command_tree(level + 1)
         return tree_str
 
-    def _get_usage(self) -> str:
-        usage_parts = [self.name]
+    def _get_usage(self, command_path: List[Command] = None) -> str:
+        command_path_str = (
+            [cmd.name for cmd in reversed(command_path)] if command_path else [self.name]
+        )
+        usage_parts = command_path_str
 
-        if not self.is_group:
-            parameters: Dict[str, inspect.Parameter] = self.signature.parameters
+        command = command_path[0] if command_path else self
+
+        if not command.is_group:
+            parameters: Dict[str, inspect.Parameter] = command.signature.parameters
 
             for name, param in parameters.items():
                 if name in ("self", "cls"):
@@ -139,7 +171,7 @@ class Command:
 
         else:
             possible_cmd_str = ["{"]
-            for subcmd_name in self.subcommands.keys():
+            for subcmd_name in command.subcommands.keys():
                 possible_cmd_str.append(f"{subcmd_name},")
             possible_cmd_str[-1] = possible_cmd_str[-1][:-1]  # Remove trailing comma
             possible_cmd_str.append("}")
@@ -147,20 +179,78 @@ class Command:
 
         return " ".join(usage_parts)
 
-    def _handle_parsing_error(self, error: ParseError, argv: List[str]):
+    def get_help(self, command_path: List[Command] = None) -> str:
+        help_lines = [f"usage: {self._get_usage(command_path)}\n"]
+
+        if self.description:
+            help_lines.append(f"{self.description}\n")
+
+        if not self.is_group:
+            help_lines.append("options:")
+
+            # Get the max length of argument names for formatting
+            max_arg_length = max(len(arg.name) for arg in self.args.values()) if self.args else 0
+            max_type_length = (
+                max(
+                    len(arg.type.__name__) if arg.type is not None else 3
+                    for arg in self.args.values()
+                )
+                if self.args
+                else 0
+            )
+
+            for arg in self.args.values():
+                arg_str = f"--{arg.name}"
+
+                value_str = ""
+                if arg.type != bool:
+                    value_str = arg.name.upper()
+
+                type_name = f":{arg.type.__name__}" if arg.type is not None else ":str"
+                if arg.type == bool:
+                    type_name = ""
+
+                default_str = ""
+                if arg.is_optional:
+                    default_str = f" (default: {arg.default})" if arg.default is not None else ""
+
+                spaces = (
+                    2 * max_arg_length + max_type_length + 7 - len(arg_str + value_str + type_name)
+                )
+
+                help_lines.append(
+                    " " * 2
+                    + arg_str
+                    + " "
+                    + value_str
+                    + type_name
+                    + " " * spaces
+                    + f"{arg.help}{default_str}"
+                )
+
+        else:
+            help_lines.append("subcommands:")
+            for subcmd in self.subcommands.values():
+                desc = subcmd.description if subcmd.description else "No description available."
+                help_lines.append(f"  {subcmd.name}: {desc}")
+
+        return "\n".join(help_lines)
+
+    def _handle_parsing_error(
+        self, error: ParseError, argv: List[str], command_tree: List[Command]
+    ) -> None:
         token = error.token.value if error.token else None
 
-        print("Usage:")
-        print(f"  {self._get_usage()}")
-        print()
+        print(f"usage: {self._get_usage(command_tree)}")
 
         if token:
+            print("command:")
             joined_argv = " ".join([self.name] + argv)
             token_position = joined_argv.find(token)
             if token_position != -1:
                 underline = " " * token_position + "^" * len(token)
-                print(joined_argv)
-                print(underline)
+                print(4 * " " + "$ " + joined_argv)
+                print(6 * " " + underline)
 
-        print(f"Error: {error.message}")
+        print(f"{self.name}: error: {error.message}")
         sys.exit(1)

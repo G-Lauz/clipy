@@ -8,9 +8,9 @@ import inspect
 class Argument:
     name: str
     type: type
-    default: any
     help: str
     kind: inspect._ParameterKind
+    default: any = inspect.Parameter.empty
 
     @property
     def is_required(self):
