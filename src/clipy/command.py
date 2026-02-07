@@ -133,17 +133,9 @@ class Command:
                 # Override the default class name of an attribute command with the attribute name
                 obj.name = member if not obj.enforce_name else obj.name
 
-                subcommands[member] = obj
+                subcommands[obj.name] = obj
 
         return subcommands
-
-    def build_command_tree(self, level=0):
-        indent = "  " * level
-        tree_str = f"{indent}- {self.name}\n"
-        if self.is_group:
-            for subcmd_name, subcmd in self.subcommands.items():
-                tree_str += subcmd.build_command_tree(level + 1)
-        return tree_str
 
     def _get_usage(self, command_path: List[Command] = None) -> str:
         command_path_str = (

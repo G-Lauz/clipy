@@ -17,6 +17,22 @@ def test_subcommand_no_args():
         cmd()  # pylint: disable=missing-kwoa
 
 
+def test_named_subcommand():
+    class MainCommand(clipy.Command):
+        @clipy.Command(name="custom_subcmd")
+        def subcmd(self):
+            pass
+
+    with patch("sys.argv", ["test.py", "custom_subcmd"]):
+        cmd = MainCommand()
+        cmd()  # pylint: disable=missing-kwoa
+
+    with patch("sys.argv", ["test.py", "subcmd"]):
+        cmd = MainCommand()
+        with pytest.raises(SystemExit):
+            cmd()  # pylint: disable=missing-kwoa
+
+
 def test_nested_subcommand_no_args():
     class SubCommand(clipy.Command):
         @clipy.Command

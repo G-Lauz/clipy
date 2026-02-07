@@ -113,6 +113,14 @@ class Parser:
                             arg_names.remove(child.arg_instance.name)
                 arg_name = arg_names[0]
 
+                # Ignore help argument here, which a special case
+                # TODO: we should handle colision with help use by the user as parameter name
+                if arg_name == "help":
+                    if len(arg_names) > 1:
+                        arg_name = arg_names[1]
+                    else:
+                        raise UnexpectedPositionalArgumentError(token)
+
                 argument = command_node.cmd_instance.args.get(arg_name)
 
                 if argument is None:
