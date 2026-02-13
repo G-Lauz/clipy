@@ -52,6 +52,17 @@ class Command:
 
         self.signature = None
         self.args = self.get_args()
+
+        # Store the func-level description (from __call__ or decorated func docstring)
+        self.func_description = self.description
+
+        # Use class docstring as the high-level description (shown in subcommand listings)
+        if self.__class__.__doc__:
+            self.description = self.__class__.__doc__.strip()
+        # If no class docstring, keep the func description
+        elif not self.description:
+            self.description = None
+
         self.usage = self._get_usage()
 
     def __get__(self, instance, owner):
@@ -158,7 +169,9 @@ class Command:
 
         command = command_path[0] if command_path else self
 
-        if not command.is_group:
+        has_own_args = command.func is not None and command.signature is not None
+
+        if has_own_args:
             parameters: Dict[str, inspect.Parameter] = command.signature.parameters
 
             for name, param in parameters.items():
@@ -174,7 +187,7 @@ class Command:
                 # All parameters are optional (wrapped in [])
                 usage_parts.append(f"[--{name} <{type_name}>]")
 
-        else:
+        if command.is_group:
             possible_cmd_str = ["{"]
             for subcmd_name in command.subcommands.keys():
                 possible_cmd_str.append(f"{subcmd_name},")
@@ -187,10 +200,15 @@ class Command:
     def get_help(self, command_path: List[Command] = None) -> str:
         help_lines = [f"usage: {self._get_usage(command_path)}\n"]
 
-        if self.description:
-            help_lines.append(f"{self.description}\n")
+        # Prefer the func-level description (e.g. __call__ docstring) for detailed help,
+        # fall back to the high-level class docstring
+        detail = self.func_description or self.description
+        if detail:
+            help_lines.append(f"{detail}\n")
 
-        if not self.is_group:
+        has_own_args = self.func is not None and self.signature is not None
+
+        if has_own_args:
             help_lines.append("options:")
 
             # Get the max length of argument names for formatting
@@ -233,7 +251,9 @@ class Command:
                     + f"{arg.help}{default_str}"
                 )
 
-        else:
+        if self.is_group:
+            if has_own_args:
+                help_lines.append("")  # blank line between options and subcommands
             help_lines.append("subcommands:")
             for subcmd in self.subcommands.values():
                 desc = subcmd.description if subcmd.description else "No description available."

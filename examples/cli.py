@@ -8,7 +8,16 @@ def greeting(name: str):
 
 
 class SubCommand(Command):
-    description = "This is a subcommand group"
+    """This is a subcommand group"""
+
+    def __call__(self, arg1: int):
+        """
+        Docstring for __call__
+
+        Args:
+            arg1: An integer argument for the subcommand
+        """
+        print(f"SubCommand executed with arg1={arg1}")
 
     @Command
     def subsubcmd1(self):
@@ -17,6 +26,8 @@ class SubCommand(Command):
 
 
 class SuperSubCommand(Command):
+    """This super command is both a command and a group."""
+
     def __call__(self):
         print("This super command is both a command and a group.")
 
