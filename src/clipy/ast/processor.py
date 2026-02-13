@@ -54,11 +54,29 @@ class CommandExecutor(ASTProcessor):
                     parsed_args[child.arg_instance.name] = child.value
 
         ordered_args = []
+        named_kwargs = {}
         if node.cmd_instance.signature is not None:
-            for name in node.cmd_instance.signature.parameters.keys():
-                if name in parsed_args:
+            use_keyword = False
+            for name, param in node.cmd_instance.signature.parameters.items():
+                if name in ("self", "cls"):
+                    continue
+                if param.kind == inspect.Parameter.VAR_POSITIONAL:
+                    use_keyword = True
+                    continue
+                if param.kind == inspect.Parameter.VAR_KEYWORD:
+                    continue
+                if name not in parsed_args:
+                    if not use_keyword:
+                        # A gap in positional args: all subsequent args must be keyword
+                        use_keyword = True
+                    continue
+                if use_keyword or param.kind == inspect.Parameter.KEYWORD_ONLY:
+                    named_kwargs[name] = parsed_args[name]
+                else:
                     ordered_args.append(parsed_args[name])
+
         ordered_args.extend(positional_args)
+        named_kwargs.update(kwargs)
 
         # Check for help flag
         if "help" in parsed_args and parsed_args["help"]:
@@ -66,7 +84,16 @@ class CommandExecutor(ASTProcessor):
             subcommand_path.append((node.cmd_instance, None))
             return subcommand_path, help_flag
 
-        if not node.cmd_instance.is_group:
+        # Determine if we should execute the function
+        # We execute if:
+        # 1. It's not a group (always has a function)
+        # 2. It IS a group, but has a function AND no subcommand was invoked (leaf execution of a hybrid group)
+        has_subcommand = any(isinstance(child, CommandNode) for child in node.children)
+        should_execute = (not node.cmd_instance.is_group) or (
+            node.cmd_instance.func is not None and not has_subcommand
+        )
+
+        if should_execute:
 
             # Check if it's a bound method (with self or cls)
             func = node.cmd_instance.func
@@ -80,7 +107,7 @@ class CommandExecutor(ASTProcessor):
                 # Use the bound method
                 func = func.__get__(node.cmd_instance, type(node.cmd_instance))
 
-            binding = signature.bind(*ordered_args, **kwargs)
+            binding = signature.bind(*ordered_args, **named_kwargs)
             binding.apply_defaults()
             return_value = func(*binding.args, **binding.kwargs)
 

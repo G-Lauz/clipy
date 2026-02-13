@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import inspect
 import sys
 from typing import Callable, Dict, List
@@ -39,14 +40,29 @@ class Command:
 
         self.func = func
 
-        self.is_group = False
+        # Check if __call__ is overridden in the subclass
+        if self.func is None and self.__class__.__call__ is not Command.__call__:
+            self.func = self.__call__
+
+        self.subcommands = self.get_subcommands()
+
+        self.is_group = bool(self.subcommands)
         if self.func is None:
             self.is_group = True
 
         self.signature = None
         self.args = self.get_args()
-        self.subcommands = self.get_subcommands()
         self.usage = self._get_usage()
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+
+        cmd = copy.copy(self)
+        if cmd.func:
+            cmd.func = cmd.func.__get__(instance, owner)
+            cmd.signature = inspect.signature(cmd.func)
+        return cmd
 
     def __call__(self, *args, **kwargs):
         # If we're in deferred init mode, the first call receives the function
@@ -83,8 +99,8 @@ class Command:
             kind=inspect.Parameter.KEYWORD_ONLY,
         )
 
-        # If it's a group there is no need to set description and signature yet
-        if self.is_group:
+        # If it's a group AND has no function, there is no need to set description and signature
+        if self.is_group and self.func is None:
             args["help"] = help_argument
             return args
 
@@ -119,9 +135,6 @@ class Command:
         return args
 
     def get_subcommands(self) -> Dict[str, "Command"]:
-        if not self.is_group:
-            return None
-
         # get class members
         cls_members = dir(self)
 

@@ -17,6 +17,22 @@ def test_subcommand_no_args():
         cmd()  # pylint: disable=missing-kwoa
 
 
+def test_init_attribute_assignment():
+    class MainCommand(clipy.Command):
+        def __init__(self):
+            super().__init__()
+            self.test = "example"
+
+        @clipy.Command
+        def subcmd(self):
+            return self.test
+
+    with patch("sys.argv", ["test.py", "subcmd"]):
+        cmd = MainCommand()
+        result = cmd()  # pylint: disable=no-value-for-parameter
+        assert result == "example"
+
+
 def test_named_subcommand():
     class MainCommand(clipy.Command):
         @clipy.Command(name="custom_subcmd")
