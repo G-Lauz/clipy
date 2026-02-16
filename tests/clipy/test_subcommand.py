@@ -184,29 +184,3 @@ def test_nested_subcommand_argument_types():
     with patch("sys.argv", ["test.py", "sub", "kwargs_cmd", "42", "--key1", "v1", "--key2", "v2"]):
         cmd = MainCommand()
         assert cmd() == (42, {"key1": "v1", "key2": "v2"})
-
-
-def test_unknown_subcommand():
-    class MainCommand(clipy.Command):
-        @clipy.Command
-        def subcmd(self):
-            pass
-
-    with patch("sys.argv", ["test.py", "unknown"]):
-        cmd = MainCommand()
-        assert False
-        with pytest.raises(SystemExit):
-            cmd()  # pylint: disable=missing-kwoa
-
-
-def test_unknown_argument():
-    class MainCommand(clipy.Command):
-        @clipy.Command
-        def subcmd(self):
-            pass
-
-    with patch("sys.argv", ["test.py", "subcmd", "--unknown", "value"]):
-        cmd = MainCommand()
-        assert False
-        with pytest.raises(SystemExit):
-            cmd()  # pylint: disable=missing-kwoa

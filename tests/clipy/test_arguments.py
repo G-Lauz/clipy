@@ -180,6 +180,28 @@ def test_flag_args():
         assert result == (42, False)
 
 
+def test_flag_with_explicit_value():
+    @clipy.Command
+    def func(verbose: bool = False):
+        return verbose
+
+    with patch("sys.argv", ["test.py", "--verbose", "True"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result is True
+
+    with patch("sys.argv", ["test.py", "--verbose", "False"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result is False
+
+    with patch("sys.argv", ["test.py", "--verbose", "1"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result is True
+
+    with patch("sys.argv", ["test.py", "--verbose", "0"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result is False
+
+
 def test_argument_definition_order():
     @clipy.Command
     def func1(flag: bool = False, value: int = 0):
@@ -198,6 +220,26 @@ def test_argument_definition_order():
     with patch("sys.argv", argv):
         result2 = func2()  # pylint: disable=no-value-for-parameter
         assert result2 == (42, True)
+
+
+def test_flag_followed_by_positional():
+    @clipy.Command
+    def func(name: str, flag: bool = False):
+        return name, flag
+
+    with patch("sys.argv", ["test.py", "--flag", "hello"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == ("hello", True)
+
+
+def test_flag_followed_by_list_positional():
+    @clipy.Command
+    def func(items: list[str] = [], flag: bool = False):
+        return items, flag
+
+    with patch("sys.argv", ["test.py", "--flag", "--items", "a", "b", "c"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == (["a", "b", "c"], True)
 
 
 def test_variable_kwargs():

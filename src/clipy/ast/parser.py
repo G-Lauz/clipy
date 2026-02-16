@@ -318,9 +318,24 @@ class Parser:
         else:
             # For flags (boolean options)
             if argument.type == bool:
-                flag_node = ArgumentNode(
-                    argument, True
-                )  # TODO: handle false case, store_action, invert? etc
+                flag_value = True
+
+                # The tokenizer may have eagerly consumed the next token as a
+                # VALUE for this option. If it looks like a boolean value,
+                # consume it; otherwise convert it back to a positional token.
+                if (
+                    self.tokenizer.buffered_token
+                    and self.tokenizer.buffered_token[0].type == TokenType.VALUE
+                ):
+                    buffered = self.tokenizer.buffered_token[0]
+                    if buffered.value.lower() in ("true", "false", "1", "0"):
+                        self.tokenizer.buffered_token.popleft()
+                        flag_value = buffered.value.lower() in ("true", "1")
+                    else:
+                        self.tokenizer.buffered_token.popleft()
+                        self.tokenizer.push_back(Token(TokenType.POSITIONAL, buffered.value))
+
+                flag_node = ArgumentNode(argument, flag_value)
                 command_node.add_child(flag_node)
 
     def _handle_combined_options(self, token, command_node: CommandNode):
