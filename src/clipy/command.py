@@ -157,6 +157,13 @@ class Command:
                 # Override the default class name of an attribute command with the attribute name
                 obj.name = member if not obj.enforce_name else obj.name
 
+                if obj.name in subcommands:
+                    existing = subcommands[obj.name]
+                    raise ValueError(
+                        f"subcommand name conflict: '{obj.name}' is already defined by "
+                        f"'{existing.func.__name__}', cannot be reused by '{member}'"
+                    )
+
                 subcommands[obj.name] = obj
 
         return subcommands

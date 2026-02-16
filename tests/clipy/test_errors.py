@@ -236,3 +236,23 @@ def test_subcommand_unknown_argument_raises(capsys):
     assert "^" * len("--unknown") in output
     assert "error:" in output
     assert "unknown argument" in output
+
+
+# =============================================================================
+# Subcommand name conflict
+# =============================================================================
+
+
+def test_subcommand_name_conflict_raises():
+    with pytest.raises(ValueError, match="subcommand name conflict"):
+
+        class ConflictCommand(clipy.Command):
+            @clipy.Command(name="cmd2")
+            def cmd1(self):
+                pass
+
+            @clipy.Command
+            def cmd2(self):
+                pass
+
+        ConflictCommand()
