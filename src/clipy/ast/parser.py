@@ -37,6 +37,18 @@ class Parser:
         self.current_token = self.tokenizer.next()
         return self.current_token
 
+    def _consume_value(self) -> Token:
+        """Consume the next token, expecting it to be a value for an option.
+
+        Values arrive as VALUE tokens (from --opt=val syntax) or as
+        POSITIONAL tokens (from --opt val syntax). Anything else means
+        no value was provided.
+        """
+        token = self._get_next_token()
+        if token.type not in (TokenType.VALUE, TokenType.POSITIONAL):
+            raise MissingRequiredValueError(token)
+        return token
+
     def parse(self) -> CommandNode:
         self.tokenizer.reset()
 
@@ -71,108 +83,11 @@ class Parser:
                 continue
 
             elif token.type == TokenType.POSITIONAL:
-
-                # Check if there are subcommands
-                found_command = False
                 if command_node.cmd_instance.is_group:
-                    sub_cmd = command_node.cmd_instance.subcommands.get(token.value, None)
-                    if sub_cmd:
-                        # Found a subcommand, create a new CommandNode and recurse
-                        try:
-                            subcommand_node = self._recursive_parse(sub_cmd)
-                            command_node.add_child(subcommand_node)
-                            found_command = True
-                        except ParseError as error:
-                            raise error from error
-                        finally:
-                            self.command_tree.append(sub_cmd)
-
+                    if self._try_handle_subcommand(token, command_node):
                         return command_node
 
-                if found_command:
-                    continue
-
-                # It's an argument for the current command
-                if command_node.cmd_instance.args is None:
-                    raise UnexpectedPositionalArgumentError(token)
-
-                # check if an argument is a var-positional
-                has_varargs_argument = command_node.cmd_instance.args and any(
-                    arg.kind == inspect.Parameter.VAR_POSITIONAL
-                    for arg in command_node.cmd_instance.args.values()
-                )
-
-                if args_parsed >= num_args and not has_varargs_argument:
-                    raise TooManyArgumentsError()
-
-                # Get the next expected argument
-                arg_names = list(command_node.cmd_instance.args.keys())
-                for child in command_node.children:
-                    if isinstance(child, ArgumentNode):
-                        if child.arg_instance.name in arg_names:
-                            arg_names.remove(child.arg_instance.name)
-                arg_name = arg_names[0]
-
-                # Ignore help argument here, which a special case
-                # TODO: we should handle colision with help use by the user as parameter name
-                if arg_name == "help":
-                    if len(arg_names) > 1:
-                        arg_name = arg_names[1]
-                    else:
-                        raise UnexpectedPositionalArgumentError(token)
-
-                argument = command_node.cmd_instance.args.get(arg_name)
-
-                if argument is None:
-                    raise UnexpectedPositionalArgumentError(token)
-
-                if argument.kind == inspect.Parameter.VAR_POSITIONAL:
-                    try:
-                        values = [argument.type(token.value) if argument.type else token.value]
-                    except (ValueError, TypeError) as error:
-                        raise InvalidArgumentTypeError(
-                            argument.type.__name__ if argument.type else "str", token
-                        ) from error
-
-                    token_is_part_of_the_list = True
-                    while token_is_part_of_the_list:
-                        value_token = self._get_next_token()
-
-                        token_is_part_of_the_list = (
-                            value_token.type == TokenType.VALUE
-                            or value_token.type == TokenType.POSITIONAL
-                        )
-                        if not token_is_part_of_the_list:
-                            # Push back the token for further processing
-                            self.tokenizer.push_back(value_token)
-                        else:
-                            # Cast the value to the appropriate inner type
-                            try:
-                                value = (
-                                    argument.type(value_token.value)
-                                    if argument.type
-                                    else value_token.value
-                                )
-                            except (ValueError, TypeError) as error:
-                                raise InvalidArgumentTypeError(
-                                    argument.type.__name__ if argument.type else "str", value_token
-                                ) from error
-                            values.append(value)
-
-                    option_node = ArgumentNode(argument, values)
-                    command_node.add_child(option_node)
-
-                else:
-                    # Cast the value to the appropriate type
-                    try:
-                        value = argument.type(token.value) if argument.type else token.value
-                    except (ValueError, TypeError) as error:
-                        raise InvalidArgumentTypeError(
-                            argument.type.__name__ if argument.type else "str", token
-                        ) from error
-                    argument_node = ArgumentNode(argument, value)
-                    command_node.add_child(argument_node)
-                    args_parsed += 1
+                args_parsed += self._handle_positional(token, command_node, args_parsed, num_args)
 
             elif token.type == TokenType.END:
                 continue
@@ -183,6 +98,112 @@ class Parser:
 
         self.check_expected_args(command_node)
         return command_node
+
+    def _try_handle_subcommand(self, token: Token, command_node: CommandNode) -> bool:
+        """Try to match the token as a subcommand name.
+
+        If a subcommand is found, recursively parse it and attach it to the
+        command node. Returns True if a subcommand was matched, False otherwise.
+        """
+        sub_cmd = command_node.cmd_instance.subcommands.get(token.value, None)
+        if sub_cmd is None:
+            return False
+
+        try:
+            subcommand_node = self._recursive_parse(sub_cmd)
+            command_node.add_child(subcommand_node)
+        except ParseError as error:
+            raise error from error
+        finally:
+            self.command_tree.append(sub_cmd)
+
+        return True
+
+    def _handle_positional(
+        self, token: Token, command_node: CommandNode, args_parsed: int, num_args: int
+    ) -> int:
+        """Handle a positional argument token.
+
+        Returns 1 if a regular positional was consumed (to increment the
+        caller's counter), or 0 for VAR_POSITIONAL arguments.
+        """
+        if command_node.cmd_instance.args is None:
+            raise UnexpectedPositionalArgumentError(token)
+
+        # check if an argument is a var-positional
+        has_varargs_argument = command_node.cmd_instance.args and any(
+            arg.kind == inspect.Parameter.VAR_POSITIONAL
+            for arg in command_node.cmd_instance.args.values()
+        )
+
+        if args_parsed >= num_args and not has_varargs_argument:
+            raise TooManyArgumentsError()
+
+        # Get the next expected argument
+        arg_names = list(command_node.cmd_instance.args.keys())
+        for child in command_node.children:
+            if isinstance(child, ArgumentNode):
+                if child.arg_instance.name in arg_names:
+                    arg_names.remove(child.arg_instance.name)
+        arg_name = arg_names[0]
+
+        # Ignore help argument here, which a special case
+        # TODO: we should handle colision with help use by the user as parameter name
+        if arg_name == "help":
+            if len(arg_names) > 1:
+                arg_name = arg_names[1]
+            else:
+                raise UnexpectedPositionalArgumentError(token)
+
+        argument = command_node.cmd_instance.args.get(arg_name)
+
+        if argument is None:
+            raise UnexpectedPositionalArgumentError(token)
+
+        if argument.kind == inspect.Parameter.VAR_POSITIONAL:
+            try:
+                values = [argument.type(token.value) if argument.type else token.value]
+            except (ValueError, TypeError) as error:
+                raise InvalidArgumentTypeError(
+                    argument.type.__name__ if argument.type else "str", token
+                ) from error
+
+            token_is_part_of_the_list = True
+            while token_is_part_of_the_list:
+                value_token = self._get_next_token()
+
+                token_is_part_of_the_list = (
+                    value_token.type == TokenType.VALUE or value_token.type == TokenType.POSITIONAL
+                )
+                if not token_is_part_of_the_list:
+                    # Push back the token for further processing
+                    self.tokenizer.push_back(value_token)
+                else:
+                    # Cast the value to the appropriate inner type
+                    try:
+                        value = (
+                            argument.type(value_token.value) if argument.type else value_token.value
+                        )
+                    except (ValueError, TypeError) as error:
+                        raise InvalidArgumentTypeError(
+                            argument.type.__name__ if argument.type else "str", value_token
+                        ) from error
+                    values.append(value)
+
+            option_node = ArgumentNode(argument, values)
+            command_node.add_child(option_node)
+            return 0
+
+        # Cast the value to the appropriate type
+        try:
+            value = argument.type(token.value) if argument.type else token.value
+        except (ValueError, TypeError) as error:
+            raise InvalidArgumentTypeError(
+                argument.type.__name__ if argument.type else "str", token
+            ) from error
+        argument_node = ArgumentNode(argument, value)
+        command_node.add_child(argument_node)
+        return 1
 
     def _handle_option(self, token: Token, command_node: CommandNode):
 
@@ -243,11 +264,7 @@ class Parser:
                     dict_value = child.value
                     break
 
-            value_token = self._get_next_token()
-            if value_token.type != TokenType.VALUE:
-                raise MissingRequiredValueError(value_token)
-
-            # Expect key=value format
+            value_token = self._consume_value()
             if "=" not in value_token.value:
                 raise UnexpectedValueFormatError("key=value", value_token)
 
@@ -280,11 +297,9 @@ class Parser:
                     dict_value = child.value
                     break
 
-            value_token = self._get_next_token()
-            if value_token.type != TokenType.VALUE:
-                raise MissingRequiredValueError(value_token)
+            value_token = self._consume_value()
 
-            # Assume the **kwargs dictionnary to be of type dict[str, Any]
+            # Assume the **kwargs dictionary to be of type dict[str, Any]
             try:
                 value = argument.type(value_token.value) if argument.type else value_token.value
             except (ValueError, TypeError) as error:
@@ -300,9 +315,7 @@ class Parser:
 
         elif argument.type != bool:
             # Expected the next token to be a value
-            value_token = self._get_next_token()
-            if value_token.type != TokenType.VALUE:
-                raise MissingRequiredValueError(value_token)
+            value_token = self._consume_value()
 
             # Cast the value to the appropriate type
             try:
@@ -317,26 +330,22 @@ class Parser:
 
         else:
             # For flags (boolean options)
-            if argument.type == bool:
-                flag_value = True
+            flag_value = True
 
-                # The tokenizer may have eagerly consumed the next token as a
-                # VALUE for this option. If it looks like a boolean value,
-                # consume it; otherwise convert it back to a positional token.
-                if (
-                    self.tokenizer.buffered_token
-                    and self.tokenizer.buffered_token[0].type == TokenType.VALUE
-                ):
-                    buffered = self.tokenizer.buffered_token[0]
-                    if buffered.value.lower() in ("true", "false", "1", "0"):
-                        self.tokenizer.buffered_token.popleft()
-                        flag_value = buffered.value.lower() in ("true", "1")
-                    else:
-                        self.tokenizer.buffered_token.popleft()
-                        self.tokenizer.push_back(Token(TokenType.POSITIONAL, buffered.value))
+            # Peek at the next token: if it's a boolean literal, consume it
+            # as the explicit value for this flag.
+            next_token = self._get_next_token()
+            if next_token.type in (
+                TokenType.VALUE,
+                TokenType.POSITIONAL,
+            ) and next_token.value.lower() in ("true", "false", "1", "0"):
+                flag_value = next_token.value.lower() in ("true", "1")
+            else:
+                # Not a boolean literal - push back for further processing
+                self.tokenizer.push_back(next_token)
 
-                flag_node = ArgumentNode(argument, flag_value)
-                command_node.add_child(flag_node)
+            flag_node = ArgumentNode(argument, flag_value)
+            command_node.add_child(flag_node)
 
     def _handle_combined_options(self, token, command_node: CommandNode):
         # TODO: implement handling of combined short options

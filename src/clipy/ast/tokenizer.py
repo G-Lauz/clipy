@@ -38,9 +38,6 @@ class Tokenizer:
     def has_next(self) -> bool:
         return self.index < len(self.argv) + len(self.buffered_token) + 1
 
-    def _has_next_without_end(self) -> bool:
-        return self.index < len(self.argv) + len(self.buffered_token)
-
     def next(self) -> Token:
         if self.buffered_token:
             return self.buffered_token.popleft()
@@ -70,12 +67,6 @@ class Tokenizer:
                 self.buffered_token.append(Token(TokenType.VALUE, value))
                 return Token(TokenType.LONG_OPT, name)
             else:
-                # peek for next token to see if it's a value
-                if self._has_next_without_end():
-                    if not self.argv[self.index].startswith("-"):
-                        next_item = self.argv[self.index]
-                        self.index += 1
-                        self.buffered_token.append(Token(TokenType.VALUE, next_item))
                 return Token(TokenType.LONG_OPT, item)
 
         # Handle short options (-o value or -ovalue or -abc)
@@ -85,12 +76,6 @@ class Tokenizer:
                 return Token(TokenType.SHORT_OPT_COMBINED, item)
             else:
                 # Single short option like -a
-                # peek for next token to see if it's a value
-                if self._has_next_without_end():
-                    if not self.argv[self.index].startswith("-"):
-                        next_item = self.argv[self.index]
-                        self.index += 1
-                        self.buffered_token.append(Token(TokenType.VALUE, next_item))
                 return Token(TokenType.SHORT_OPT, item)
 
         return Token(TokenType.POSITIONAL, item)
