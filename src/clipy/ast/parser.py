@@ -173,13 +173,9 @@ class Parser:
                     arg_names.remove(child.arg_instance.name)
         arg_name = arg_names[0]
 
-        # Ignore help argument here, which a special case
-        # TODO: we should handle colision with help use by the user as parameter name
-        if arg_name == "help":
-            if len(arg_names) > 1:
-                arg_name = arg_names[1]
-            else:
-                raise UnexpectedPositionalArgumentError(token)
+        # Ignore reservered keyword arguments
+        if arg_name in command_node.cmd_instance.RESERVED_KEYWORDS:
+            raise UnexpectedPositionalArgumentError(token)
 
         argument = command_node.cmd_instance.args.get(arg_name)
 
@@ -329,6 +325,6 @@ class Parser:
                 expected_args.add(arg_name)
 
         missing_args = expected_args - provided_args
-        missing_args = missing_args - {"help"}
+        missing_args = missing_args - command_node.cmd_instance.RESERVED_KEYWORDS
         if missing_args and "help" not in provided_args:
             raise MissingRequiredArgumentError(missing_args)

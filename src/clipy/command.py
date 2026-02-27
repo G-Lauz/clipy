@@ -22,6 +22,8 @@ class Command:
     args: Dict[str, Argument]
     subcommands: Dict[str, "Command"]
 
+    RESERVED_KEYWORDS = {"help"}
+
     def __init__(self, func: Callable = None, *, name: str = None):
         # If func is None AND we're being called directly on Command class (not a subclass),
         # we're being used as @Command(name="...") and need to return a decorator
@@ -128,6 +130,8 @@ class Command:
             # TODO: better handling of 'self' and 'cls'
             if name in ("self", "cls"):
                 continue
+
+            self._handle_reserved_keyword_error(name)
 
             annotation = (
                 param.annotation if param.annotation is not inspect.Parameter.empty else None
@@ -286,3 +290,10 @@ class Command:
 
         print(f"{self.name}: error: {error.message}")
         sys.exit(1)
+
+    def _handle_reserved_keyword_error(self, name: str) -> None:
+        if name in self.RESERVED_KEYWORDS:
+            function_definition = f"def {self.name}{self.signature}:"
+            raise SyntaxError(
+                f"'{name}' is a reserved keyword argument for command functions and cannot be used as parameter name in `{function_definition}`."
+            )

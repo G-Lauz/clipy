@@ -5,6 +5,22 @@ import pytest
 import clipy
 
 # =============================================================================
+# Reserved Keyword Argument Error
+# =============================================================================
+
+
+def test_reserved_keyword_as_parameter_name_raises(capsys):
+    with pytest.raises(SyntaxError) as exc_info:
+
+        @clipy.Command
+        def func(help: str):
+            return help
+
+    assert "reserved keyword argument" in str(exc_info.value)
+    assert "def func(help: str):" in str(exc_info.value)
+
+
+# =============================================================================
 # UnknownArgumentError
 # =============================================================================
 

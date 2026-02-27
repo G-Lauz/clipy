@@ -65,18 +65,23 @@ class NestedCommand(Command):
         """Execute cmd2"""
         print(f"cmd2 executed with {arg}")
 
-    @Command
-    def cmd3(self):
-        """Execute cmd3"""
-        assert (
-            False
-        ), "Should resolve name conflict and raise an error instead of executing this method"
-        print("cmd3 executed")
+    # @Command
+    # def cmd3(self):
+    #     """Execute cmd3"""
+    #     assert (
+    #         False
+    #     ), "Should resolve name conflict and raise an error instead of executing this method"
+    #     print("cmd3 executed")
 
     @Command
     def cmd4(self, alist: list[str] = [], flag: bool = False):
         """Execute cmd4"""
         print(f"cmd4 executed with flag={flag} and alist={alist}")
+
+    # @Command
+    # def cmd5(self, arg1, help: str):
+    #     """Execute cmd5"""
+    #     print(f"cmd5 executed with arg1={arg1}")
 
 
 class MainCommand(Command):
