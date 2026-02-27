@@ -37,6 +37,15 @@ class Parser:
         self.current_token = self.tokenizer.next()
         return self.current_token
 
+    def _cast_value(self, value_str: str, target_type: type, token: Token):
+        """Cast a string value to the target type, raising InvalidArgumentTypeError on failure."""
+        if target_type is None:
+            return value_str
+        try:
+            return target_type(value_str)
+        except (ValueError, TypeError) as error:
+            raise InvalidArgumentTypeError(target_type.__name__, token) from error
+
     def _consume_value(self) -> Token:
         """Consume the next token, expecting it to be a value for an option.
 
@@ -48,6 +57,23 @@ class Parser:
         if token.type not in (TokenType.VALUE, TokenType.POSITIONAL):
             raise MissingRequiredValueError(token)
         return token
+
+    def _consume_value_list(self, inner_type: type) -> list:
+        """Consume consecutive VALUE/POSITIONAL tokens and return them as a typed list.
+
+        Stops at the first token that is not VALUE or POSITIONAL and pushes
+        it back for further processing.
+        """
+        values = []
+        while True:
+            value_token = self._get_next_token()
+            if value_token.type not in (TokenType.VALUE, TokenType.POSITIONAL):
+                self.tokenizer.push_back(value_token)
+                break
+
+            values.append(self._cast_value(value_token.value, inner_type, value_token))
+
+        return values
 
     def parse(self) -> CommandNode:
         self.tokenizer.reset()
@@ -161,46 +187,14 @@ class Parser:
             raise UnexpectedPositionalArgumentError(token)
 
         if argument.kind == inspect.Parameter.VAR_POSITIONAL:
-            try:
-                values = [argument.type(token.value) if argument.type else token.value]
-            except (ValueError, TypeError) as error:
-                raise InvalidArgumentTypeError(
-                    argument.type.__name__ if argument.type else "str", token
-                ) from error
-
-            token_is_part_of_the_list = True
-            while token_is_part_of_the_list:
-                value_token = self._get_next_token()
-
-                token_is_part_of_the_list = (
-                    value_token.type == TokenType.VALUE or value_token.type == TokenType.POSITIONAL
-                )
-                if not token_is_part_of_the_list:
-                    # Push back the token for further processing
-                    self.tokenizer.push_back(value_token)
-                else:
-                    # Cast the value to the appropriate inner type
-                    try:
-                        value = (
-                            argument.type(value_token.value) if argument.type else value_token.value
-                        )
-                    except (ValueError, TypeError) as error:
-                        raise InvalidArgumentTypeError(
-                            argument.type.__name__ if argument.type else "str", value_token
-                        ) from error
-                    values.append(value)
+            initial = self._cast_value(token.value, argument.type, token)
+            values = [initial] + self._consume_value_list(argument.type)
 
             option_node = ArgumentNode(argument, values)
             command_node.add_child(option_node)
             return 0
 
-        # Cast the value to the appropriate type
-        try:
-            value = argument.type(token.value) if argument.type else token.value
-        except (ValueError, TypeError) as error:
-            raise InvalidArgumentTypeError(
-                argument.type.__name__ if argument.type else "str", token
-            ) from error
+        value = self._cast_value(token.value, argument.type, token)
         argument_node = ArgumentNode(argument, value)
         command_node.add_child(argument_node)
         return 1
@@ -232,22 +226,7 @@ class Parser:
 
         if is_list(argument.type) or argument.kind == inspect.Parameter.VAR_POSITIONAL:
             inner_type = get_list_inner_type(argument.type)
-            values = []
-
-            token_is_part_of_the_list = True
-            while token_is_part_of_the_list:
-                value_token = self._get_next_token()
-
-                token_is_part_of_the_list = (
-                    value_token.type == TokenType.VALUE or value_token.type == TokenType.POSITIONAL
-                )
-                if not token_is_part_of_the_list:
-                    # Push back the token for further processing
-                    self.tokenizer.push_back(value_token)
-                else:
-                    # Cast the value to the appropriate inner type
-                    value = inner_type(value_token.value) if inner_type else value_token.value
-                    values.append(value)
+            values = self._consume_value_list(inner_type)
 
             option_node = ArgumentNode(argument, values)
             command_node.add_child(option_node)
@@ -271,13 +250,8 @@ class Parser:
             key_str, val_str = value_token.value.split("=", 1)
 
             # Cast key and value to appropriate types
-            key = key_type(key_str) if key_type else key_str
-            try:
-                val = value_type(val_str) if value_type else val_str
-            except (ValueError, TypeError) as error:
-                raise InvalidArgumentTypeError(
-                    value_type.__name__ if value_type else "str", value_token
-                ) from error
+            key = self._cast_value(key_str, key_type, value_token)
+            val = self._cast_value(val_str, value_type, value_token)
 
             dict_value[key] = val
 
@@ -300,12 +274,7 @@ class Parser:
             value_token = self._consume_value()
 
             # Assume the **kwargs dictionary to be of type dict[str, Any]
-            try:
-                value = argument.type(value_token.value) if argument.type else value_token.value
-            except (ValueError, TypeError) as error:
-                raise InvalidArgumentTypeError(
-                    argument.type.__name__ if argument.type else "str", value_token
-                ) from error
+            value = self._cast_value(value_token.value, argument.type, value_token)
 
             if existing_node:
                 existing_node.value[opt_name] = value
@@ -317,13 +286,7 @@ class Parser:
             # Expected the next token to be a value
             value_token = self._consume_value()
 
-            # Cast the value to the appropriate type
-            try:
-                value = argument.type(value_token.value) if argument.type else value_token.value
-            except (ValueError, TypeError) as error:
-                raise InvalidArgumentTypeError(
-                    argument.type.__name__ if argument.type else "str", value_token
-                ) from error
+            value = self._cast_value(value_token.value, argument.type, value_token)
 
             option_node = ArgumentNode(argument, value)
             command_node.add_child(option_node)
