@@ -90,15 +90,20 @@ class Parser:
     def _recursive_parse(self, command: Command) -> CommandNode:
         command_node = CommandNode(command)
 
-        num_args = len(command.args) if command.args else 0
-        args_parsed = 0
+        num_positional_args = sum(
+            1
+            for name, arg in (command.args or {}).items()
+            if arg.kind
+            in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            and name not in command.RESERVED_KEYWORDS
+        )
+        positional_parsed = 0
 
         while self.current_token is None or self.current_token.type != TokenType.END:
             token = self._get_next_token()
 
             if token.type in [TokenType.LONG_OPT, TokenType.SHORT_OPT]:
                 self._handle_option(token, command_node)
-                args_parsed += 1
 
             elif token.type == TokenType.SHORT_OPT_COMBINED:
                 self._handle_combined_options(token, command_node)
@@ -113,7 +118,9 @@ class Parser:
                     if self._try_handle_subcommand(token, command_node):
                         return command_node
 
-                args_parsed += self._handle_positional(token, command_node, args_parsed, num_args)
+                positional_parsed += self._handle_positional(
+                    token, command_node, positional_parsed, num_positional_args
+                )
 
             elif token.type == TokenType.END:
                 continue
@@ -146,7 +153,11 @@ class Parser:
         return True
 
     def _handle_positional(
-        self, token: Token, command_node: CommandNode, args_parsed: int, num_args: int
+        self,
+        token: Token,
+        command_node: CommandNode,
+        positional_parsed: int,
+        num_positional_args: int,
     ) -> int:
         """Handle a positional argument token.
 
@@ -162,8 +173,8 @@ class Parser:
             for arg in command_node.cmd_instance.args.values()
         )
 
-        if args_parsed >= num_args and not has_varargs_argument:
-            raise TooManyArgumentsError()
+        if positional_parsed >= num_positional_args and not has_varargs_argument:
+            raise UnexpectedPositionalArgumentError(token)
 
         # Get the next expected argument
         arg_names = list(command_node.cmd_instance.args.keys())
