@@ -24,6 +24,16 @@ class Command:
 
     RESERVED_KEYWORDS = {"help"}
 
+    _user_call: Callable = None
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # If the subclass overrides __call__, save it and remove it so that
+        # Command.__call__ (the dispatch logic) stays reachable through method resolution order.
+        if "__call__" in cls.__dict__:
+            cls._user_call = cls.__dict__["__call__"]
+            del cls.__call__
+
     def __init__(self, func: Callable = None, *, name: str = None):
         # If func is None AND we're being called directly on Command class (not a subclass),
         # we're being used as @Command(name="...") and need to return a decorator
@@ -42,9 +52,9 @@ class Command:
 
         self.func = func
 
-        # Check if __call__ is overridden in the subclass
-        if self.func is None and self.__class__.__call__ is not Command.__call__:
-            self.func = self.__call__
+        # Check if the subclass defined __call__ (saved as _user_call by __init_subclass__)
+        if self.func is None and self.__class__._user_call is not None:
+            self.func = self.__class__._user_call.__get__(self, self.__class__)
 
         self.subcommands = self.get_subcommands()
 

@@ -10,6 +10,46 @@ from clipy.command import Command
 
 
 def test_group_as_command(capsys):
+    class Group(Command):
+        def __call__(self):
+            print("Group body executed")
+
+        @Command
+        def leaf(self):
+            print("leaf executed")
+
+    # Invoke the group directly (acting as a command)
+    with patch("sys.argv", ["test.py"]):
+        group = Group()
+        group()
+
+    captured = capsys.readouterr()
+    assert "Group body executed" in captured.out
+
+    # Invoke the leaf subcommand
+    with patch("sys.argv", ["test.py", "leaf"]):
+        group = Group()
+        group()
+
+    captured = capsys.readouterr()
+    assert "leaf executed" in captured.out
+
+
+def test_group_as_command_with_args(capsys):
+    class Group(Command):
+        def __call__(self, arg1: str):
+            print(f"Group body executed with arg1={arg1}")
+
+    # Invoke the group directly with an argument
+    with patch("sys.argv", ["test.py", "--arg1", "value"]):
+        group = Group()
+        group()
+
+    captured = capsys.readouterr()
+    assert "Group body executed with arg1=value" in captured.out
+
+
+def test_subgroup_as_command(capsys):
     class SubGroup(Command):
         def __call__(self):
             print("SubGroup body executed")
