@@ -77,13 +77,12 @@ class Parser:
 
     def parse(self) -> CommandNode:
         self.tokenizer.reset()
+        self.command_tree = [self.root]
 
         try:
             command_node = self._recursive_parse(self.root)
         except ParseError as error:
             raise error from error
-        finally:
-            self.command_tree.append(self.root)
 
         return command_node
 
@@ -142,13 +141,13 @@ class Parser:
         if sub_cmd is None:
             return False
 
+        self.command_tree.append(sub_cmd)
+
         try:
             subcommand_node = self._recursive_parse(sub_cmd)
             command_node.add_child(subcommand_node)
         except ParseError as error:
             raise error from error
-        finally:
-            self.command_tree.append(sub_cmd)
 
         return True
 

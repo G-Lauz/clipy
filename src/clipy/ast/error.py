@@ -1,10 +1,12 @@
+from typing import Optional
+
 from .tokenizer import Token
 
 
 class ParseError(Exception):
     """Exception raised for errors in the parsing process."""
 
-    def __init__(self, message: str, token: Token) -> None:
+    def __init__(self, message: str, token: Optional[Token] = None) -> None:
         super().__init__(message)
         self.message = message
         self.token = token

@@ -96,7 +96,10 @@ class Command:
         if help_flag:
             # The first command in the path is the one we want help for
             last_command_node = command_path[0][0] if command_path else ast_root
-            print(last_command_node.get_help(command_path=[cmd for cmd, _ in command_path]))
+            # Reverse to root-first order for usage display
+            print(
+                last_command_node.get_help(command_path=[cmd for cmd, _ in reversed(command_path)])
+            )
             sys.exit(0)
 
         return command_path[0][1] if command_path else None
@@ -173,12 +176,10 @@ class Command:
         return subcommands
 
     def _get_usage(self, command_path: List[Command] = None) -> str:
-        command_path_str = (
-            [cmd.name for cmd in reversed(command_path)] if command_path else [self.name]
-        )
+        command_path_str = [cmd.name for cmd in command_path] if command_path else [self.name]
         usage_parts = command_path_str
 
-        command = command_path[0] if command_path else self
+        command = command_path[-1] if command_path else self
 
         has_own_args = command.func is not None and command.signature is not None
 
