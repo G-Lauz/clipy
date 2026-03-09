@@ -9,7 +9,6 @@ from .error import (
     MissingRequiredArgumentError,
     MissingRequiredValueError,
     ParseError,
-    TooManyArgumentsError,
     UnexpectedPositionalArgumentError,
     UnexpectedValueFormatError,
     UnknownArgumentError,
@@ -102,10 +101,17 @@ class Parser:
             token = self._get_next_token()
 
             if token.type in [TokenType.LONG_OPT, TokenType.SHORT_OPT]:
+
+                # TODO: handle aliases (short options) and combined short options (e.g. -abc)
+                if token.type == TokenType.SHORT_OPT:
+                    raise ParseError("Short options (e.g. -o) are not yet supported", token)
+
                 self._handle_option(token, command_node)
 
+            # TODO: handle aliases (short options) and combined short options (e.g. -abc)
             elif token.type == TokenType.SHORT_OPT_COMBINED:
-                self._handle_combined_options(token, command_node)
+                raise ParseError("Combined short options (e.g. -abc) are not yet supported", token)
+                # self._handle_combined_options(token, command_node)
 
             elif token.type == TokenType.DOUBLE_HYPHEN:
                 # Do nothing, all subsequent token will be positional,
@@ -318,7 +324,7 @@ class Parser:
 
     def _handle_combined_options(self, token, command_node: CommandNode):
         # TODO: implement handling of combined short options
-        pass
+        raise NotImplementedError("Combined short options (e.g. -abc) are not yet supported")
 
     def check_expected_args(self, command_node: CommandNode) -> None:
         provided_args = set()
