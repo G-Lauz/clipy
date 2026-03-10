@@ -103,13 +103,22 @@ class Command:
         visitor = CommandExecutor()
         command_path, help_flag = ast_root.accept(visitor)
 
+        # TODO: this require annotation because the data structure is too generic.
+        # The first command in the path is the one executed
+        command_node: "Command" = command_path[0][0] if command_path else None
+
+        # Reverse to root-first order for usage display
+        path = [cmd for cmd, _ in reversed(command_path)] if command_path else []
+
+        # If empty command path, show root command help
         if help_flag:
-            # The first command in the path is the one we want help for
-            last_command_node = command_path[0][0] if command_path else ast_root
-            # Reverse to root-first order for usage display
-            print(
-                last_command_node.get_help(command_path=[cmd for cmd, _ in reversed(command_path)])
-            )
+            command_node = command_node if command_node else ast_root
+
+        # If the resolved target is a non-callable group, display usage and exit
+        is_non_callable = command_node and command_node.is_group and command_node.func is None
+
+        if is_non_callable or help_flag:
+            print(command_node.get_help(command_path=path))
             sys.exit(0)
 
         return command_path[0][1] if command_path else None

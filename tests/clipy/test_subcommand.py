@@ -5,15 +5,20 @@ import pytest
 import clipy
 
 
-def test_subcommand_no_args():
+def test_subcommand_that_do_not_resolve_should_display_usage(capsys):
     class MainCommand(clipy.Command):
         @clipy.Command
         def subcmd(self):
             pass
 
     with patch("sys.argv", ["test.py"]):
-        cmd = MainCommand()
-        cmd()  # pylint: disable=missing-kwoa
+        with pytest.raises(SystemExit):
+            cmd = MainCommand()
+            cmd()
+
+    captured = capsys.readouterr()
+    assert "usage:" in captured.out
+    assert "subcmd" in captured.out
 
 
 def test_subcommand_with_args():

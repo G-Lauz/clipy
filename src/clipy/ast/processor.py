@@ -87,7 +87,7 @@ class CommandExecutor(ASTProcessor):
         # Determine if we should execute the function
         # We execute if:
         # 1. It's not a group (always has a function)
-        # 2. It IS a group, but has a function AND no subcommand was invoked (leaf execution of a hybrid group)
+        # 2. It is a group, but has defined __call__ AND no subcommand was invoked (leaf execution of a hybrid group)
         has_subcommand = any(isinstance(child, CommandNode) for child in node.children)
         should_execute = (not node.cmd_instance.is_group) or (
             node.cmd_instance.func is not None and not has_subcommand
