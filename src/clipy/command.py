@@ -271,6 +271,7 @@ class Command:
                 spaces = (
                     2 * max_arg_length + max_type_length + 7 - len(arg_str + value_str + type_name)
                 )
+                spaces = max(spaces, 1)  # Ensure at least 1 spaces between description
 
                 help_lines.append(
                     " " * 2

@@ -41,6 +41,33 @@ def test_function_args_help():
     assert func.args["arg2"].help == 'A string argument. Defaults to "default".'
 
 
+def test_typed_args_ignored_in_description(capsys):
+    """
+    Type annotations in the argument list should not interfere with docstring parsing.
+    Annotations of the function signature should be used as type information for the arguments.
+    """
+
+    @Command
+    def func(arg1: int, arg2: str = "default"):
+        """
+        This is a test command.
+
+        Args:
+            arg1 (int): An integer argument.
+            arg2 (str): A string argument. Defaults to "default".
+        """
+        pass
+
+    captured = capsys.readouterr()
+    assert "arg1 (int)" not in captured.out
+    assert "arg2 (str)" not in captured.out
+    assert func.args["arg1"].type == int
+    assert func.args["arg2"].type == str
+
+    assert func.args["arg1"].help == "An integer argument."
+    assert func.args["arg2"].help == 'A string argument. Defaults to "default".'
+
+
 # =============================================================================
 # Class docstring as description
 # =============================================================================

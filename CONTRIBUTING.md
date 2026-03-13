@@ -12,14 +12,6 @@ This project use an [**src-layout**](https://setuptools.pypa.io/en/latest/usergu
 └── tests/
 ```
 
-## Branching Strategy
-Three type of branches are used in this project:
-| Branch | Purpose |
-| --- | --- |
-| `main` | The stable branch, which contains the latest stable release. |
-| `dev` | The development branch, which contains the latest changes and features that are being developed. |
-| others | The experimental branches, which are used for testing major breaking changes or big refactors. |
-
 ## Coding Style
 This project aim to follow the [**Google Python Style Guides**](https://google.github.io/styleguide/pyguide.html). We also try to follow the [**Google Docstring guidelines**](https://google.github.io/styleguide/pyguide.html#381-docstrings)
 
@@ -53,6 +45,14 @@ pip install -r requirements/dev-requirements.txt
 # Install pre-commit hooks
 pre-commit install
 ```
+
+## Branching Strategy
+Three type of branches are used in this project:
+| Branch | Purpose |
+| --- | --- |
+| `main` | The stable branch, which contains the latest stable release. |
+| `dev` | The development branch, which contains the latest changes and features that are being developed. |
+| others | The experimental branches, which are used for testing major breaking changes or big refactors. |
 
 ## Pull Request Guidelines
 A pull request should follow these guidelines to ensure a smooth review process:

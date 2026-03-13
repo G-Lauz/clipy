@@ -149,11 +149,8 @@ class Parser:
 
         self.command_tree.append(sub_cmd)
 
-        try:
-            subcommand_node = self._recursive_parse(sub_cmd)
-            command_node.add_child(subcommand_node)
-        except ParseError as error:
-            raise error from error
+        subcommand_node = self._recursive_parse(sub_cmd)
+        command_node.add_child(subcommand_node)
 
         return True
 

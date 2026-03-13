@@ -48,7 +48,8 @@ class MissingRequiredArgumentError(ParseError):
     """Exception raised for missing required arguments."""
 
     def __init__(self, missing_args: set):
-        message = f"missing required arguments: {', '.join(missing_args)}"
+        sorted_missing_args = sorted(missing_args)
+        message = f"missing required arguments: {', '.join(sorted_missing_args)}"
         super().__init__(message, None)
 
 

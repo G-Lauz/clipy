@@ -52,6 +52,30 @@ def test_positional_and_optional_args():
         assert result == (42, "hello")
 
 
+def test_explicit_argument_assignment():
+    @clipy.Command
+    def func(option1: int):
+        return option1
+
+    with patch("sys.argv", ["test.py", "--option1=42"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == 42
+
+
+def test_end_of_options_marker():
+    @clipy.Command
+    def func(arg1: int, arg2: str):
+        return arg1, arg2
+
+    with patch("sys.argv", ["test.py", "--", "42", "hello"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == (42, "hello")
+
+    with patch("sys.argv", ["test.py", "42", "--", "hello"]):
+        result = func()  # pylint: disable=no-value-for-parameter
+        assert result == (42, "hello")
+
+
 def test_list_args():
     @clipy.Command
     def func1(arg1: list[str], arg2: int):

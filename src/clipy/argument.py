@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+from typing import Any
 
 
 @dataclasses.dataclass
@@ -10,7 +11,7 @@ class Argument:
     type: type
     help: str
     kind: inspect._ParameterKind
-    default: any = inspect.Parameter.empty
+    default: Any = inspect.Parameter.empty
 
     @property
     def is_required(self):

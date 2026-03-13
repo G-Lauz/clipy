@@ -61,7 +61,7 @@ class GoogleStyleDocstringParser(DocstringParser):
             # Detect a new arg line (simple heuristic: contains ':' after name)
             if ":" in stripped and not in_multiline_description:
                 name, _, desc = stripped.partition(":")
-                name = name.strip()
+                name = name.split("(")[0].strip()  # handle "arg (type): desc" format
                 desc = desc.strip()
                 if desc == "":
                     in_multiline_description = True
