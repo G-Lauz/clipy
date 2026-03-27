@@ -13,6 +13,15 @@ from .docstring_parser import GoogleStyleDocstringParser
 
 
 class Command:
+    """
+    Turns a function or a class into a runnable CLI command.
+
+    Can be used as a plain decorator, a parameterised decorator, or as a
+    base class.  Subcommands are discovered automatically from class
+    attributes that are themselves ``Command`` instances or methods decorated
+    with ``@Command``.
+    """
+
     name: str = None
     description: str = None
 
@@ -35,6 +44,17 @@ class Command:
             del cls.__call__
 
     def __init__(self, func: Callable = None, *, name: str = None):
+        """
+        Turns a function or a method into a runnable CLI command.
+
+        Args:
+            func: The function to wrap as a command.  Optional when using
+                ``@Command(name="...")`` syntax or when using inheritance.
+            name: The command name to use on the CLI.  Defaults to the
+                function name or class name if not provided.  When set,
+                overrides the default name and prevents automatic naming of
+                subcommands based on their attribute names.
+        """
         # If func is None AND we're being called directly on Command class (not a subclass),
         # we're being used as @Command(name="...") and need to return a decorator
         self._deferred_init = False
@@ -69,7 +89,7 @@ class Command:
         self.func_description = self.description
 
         # Use class docstring as the high-level description (shown in subcommand listings)
-        if self.__class__.__doc__:
+        if self.__class__ is not Command and self.__class__.__doc__:
             self.description = self.__class__.__doc__.strip()
         # If no class docstring, keep the func description
         elif not self.description:

@@ -1,3 +1,5 @@
+"""AST visitor implementations for executing CLI commands."""
+
 from __future__ import annotations
 
 import abc
@@ -8,26 +10,55 @@ from .nodes import ArgumentNode, CommandNode
 
 
 class ASTProcessor(abc.ABC):
-    """
-    Abstract base class for processing AST nodes.
+    """Abstract base class for processing AST nodes.
+
     Following the Visitor design pattern.
     """
 
     @abc.abstractmethod
     def process_command(self, node: CommandNode):
+        """Process a :class:`.CommandNode`.
+
+        Args:
+            node: The command node to process.
+
+        Returns:
+            Any: Implementation-defined result.
+        """
         pass
 
     @abc.abstractmethod
     def process_argument(self, node: ArgumentNode):
+        """Process an :class:`.ArgumentNode`.
+
+        Args:
+            node: The argument node to process.
+
+        Returns:
+            Any: Implementation-defined result.
+        """
         pass
 
 
 class CommandExecutor(ASTProcessor):
-    """
-    Concrete AST processor that executes commands represented by the AST nodes.
-    """
+    """Concrete AST processor that executes commands represented by AST nodes."""
 
     def process_command(self, node: CommandNode):
+        """Execute the command represented by *node* and return its result.
+
+        Traverses the node's children to collect arguments and recurse into
+        subcommands, then invokes the command's callable with the gathered
+        values.
+
+        Args:
+            node: The :class:`.CommandNode` to execute.
+
+        Returns:
+            Tuple[List[Tuple[Command, Any]], bool]: A tuple of
+            ``(command_path, help_flag)`` where *command_path* is a list of
+            ``(command, return_value)`` pairs and *help_flag* is ``True`` if
+            the ``--help`` flag was provided.
+        """
         parsed_args: Dict[str, ArgumentNode] = {}
         positional_args = []
         kwargs = {}
@@ -118,4 +149,12 @@ class CommandExecutor(ASTProcessor):
         return subcommand_path, help_flag
 
     def process_argument(self, node: ArgumentNode):
+        """Not implemented — argument nodes are consumed by :meth:`process_command`.
+
+        Args:
+            node: The :class:`.ArgumentNode` (unused).
+
+        Raises:
+            NotImplementedError: Always.
+        """
         raise NotImplementedError("Argument processing is not implemented.")

@@ -1,3 +1,5 @@
+"""Recursive-descent parser that converts a token stream into a CLI parse tree."""
+
 from __future__ import annotations
 
 import inspect
@@ -22,9 +24,28 @@ if TYPE_CHECKING:
 
 
 class Parser:
+    """
+    Recursive-descent parser for CLI argument tokens.
+
+    Converts the raw ``argv`` token stream produced by :class:`.Tokenizer`
+    into a :class:`.CommandNode` tree that mirrors the command hierarchy.
+
+    Attributes:
+        tokenizer: The :class:`.Tokenizer` that feeds tokens to this parser.
+        root: The root :class:`.Command` used as the parsing entry point.
+        current_token: The most recently consumed :class:`.Token`.
+        command_tree: Running list of commands traversed during parsing,
+            used for error reporting.
+    """
+
     tokenizer: Tokenizer
 
     def __init__(self, root_command: Command, argv: List[str]):
+        """
+        Args:
+            root_command: The root :class:`.Command` to start parsing from.
+            argv: The raw argument list (``sys.argv[1:]``).
+        """
         self.tokenizer = Tokenizer(argv)
         self.root = root_command
 
@@ -33,11 +54,30 @@ class Parser:
         self.command_tree: List[Command] = []
 
     def _get_next_token(self):
+        """
+        Advance the tokenizer and store the result in :attr:`current_token`.
+
+        Returns:
+            Token: The next :class:`.Token` from the token stream.
+        """
         self.current_token = self.tokenizer.next()
         return self.current_token
 
     def _cast_value(self, value_str: str, target_type: type, token: Token):
-        """Cast a string value to the target type, raising InvalidArgumentTypeError on failure."""
+        """
+        Cast a string value to the target type, raising InvalidArgumentTypeError on failure.
+
+        Args:
+            value_str: The string value to cast.
+            target_type: The type to cast to.
+            token: The :class:`.Token` associated with the value.
+
+        Returns:
+            The cast value.
+
+        Raises:
+            InvalidArgumentTypeError: If the value cannot be cast to the target type.
+        """
         if target_type is None:
             return value_str
         try:
@@ -46,7 +86,8 @@ class Parser:
             raise InvalidArgumentTypeError(target_type.__name__, token) from error
 
     def _consume_value(self) -> Token:
-        """Consume the next token, expecting it to be a value for an option.
+        """
+        Consume the next token, expecting it to be a value for an option.
 
         Values arrive as VALUE tokens (from --opt=val syntax) or as
         POSITIONAL tokens (from --opt val syntax). Anything else means
@@ -58,7 +99,8 @@ class Parser:
         return token
 
     def _consume_value_list(self, inner_type: type) -> list:
-        """Consume consecutive VALUE/POSITIONAL tokens and return them as a typed list.
+        """
+        Consume consecutive VALUE/POSITIONAL tokens and return them as a typed list.
 
         Stops at the first token that is not VALUE or POSITIONAL and pushes
         it back for further processing.
@@ -75,6 +117,16 @@ class Parser:
         return values
 
     def parse(self) -> CommandNode:
+        """
+        Recursively parse the token stream into a command tree starting from the root command.
+
+        Returns:
+            CommandNode: The root node of the resulting parse tree.
+
+        Raises:
+            ParseError: If the token stream cannot be matched to the command
+                schema.
+        """
         self.tokenizer.reset()
         self.command_tree = [self.root]
 
@@ -86,6 +138,22 @@ class Parser:
         return command_node
 
     def _recursive_parse(self, command: Command) -> CommandNode:
+        """
+        Recursively parse tokens for *command* and its children.
+
+        Consumes tokens until ``END`` is reached or a subcommand boundary is
+        crossed, dispatching each token to the appropriate handler.
+
+        Args:
+            command: The :class:`.Command` whose argument schema drives
+                parsing.
+
+        Returns:
+            CommandNode: A fully populated node for *command*.
+
+        Raises:
+            ParseError: On any token that violates the command's schema.
+        """
         command_node = CommandNode(command)
 
         num_positional_args = sum(
@@ -138,7 +206,8 @@ class Parser:
         return command_node
 
     def _try_handle_subcommand(self, token: Token, command_node: CommandNode) -> bool:
-        """Try to match the token as a subcommand name.
+        """
+        Try to match the token as a subcommand name.
 
         If a subcommand is found, recursively parse it and attach it to the
         command node. Returns True if a subcommand was matched, False otherwise.
@@ -161,7 +230,8 @@ class Parser:
         positional_parsed: int,
         num_positional_args: int,
     ) -> int:
-        """Handle a positional argument token.
+        """
+        Handle a positional argument token.
 
         Returns 1 if a regular positional was consumed (to increment the
         caller's counter), or 0 for VAR_POSITIONAL arguments.
@@ -209,6 +279,23 @@ class Parser:
         return 1
 
     def _handle_option(self, token: Token, command_node: CommandNode):
+        """
+        Parse and attach an option (long or short) to *command_node*.
+
+        Reads the option name from *token*, looks up the corresponding
+        :class:`.Argument`, consumes its value(s) from the stream, and
+        appends an :class:`.ArgumentNode` to *command_node*.
+
+        Args:
+            token: The ``LONG_OPT`` or ``SHORT_OPT`` token for the option.
+            command_node: The :class:`.CommandNode` to attach the argument to.
+
+        Raises:
+            UnknownArgumentError: If the option name is not recognised and no
+                ``**kwargs`` argument is present.
+            MissingRequiredValueError: If a required value token is absent.
+            UnexpectedValueFormatError: If a dict option value is malformed.
+        """
 
         # Check if there's a var-keyword argument to capture unknown options
         has_varkwargs_argument = command_node.cmd_instance.args and any(
@@ -320,10 +407,35 @@ class Parser:
             command_node.add_child(flag_node)
 
     def _handle_combined_options(self, token, command_node: CommandNode):
+        """
+        Handle combined short options such as ``-abc``.
+
+        Not yet implemented.
+
+        Args:
+            token: The ``SHORT_OPT_COMBINED`` token.
+            command_node: The target :class:`.CommandNode`.
+
+        Raises:
+            NotImplementedError: Always, until this feature is implemented.
+        """
         # TODO: implement handling of combined short options
         raise NotImplementedError("Combined short options (e.g. -abc) are not yet supported")
 
     def check_expected_args(self, command_node: CommandNode) -> None:
+        """
+        Verify that all required arguments have been provided.
+
+        Inspects *command_node*'s children to determine which arguments were
+        supplied and raises an error if any required arguments are missing.
+
+        Args:
+            command_node: The :class:`.CommandNode` to validate.
+
+        Raises:
+            MissingRequiredArgumentError: If one or more required arguments
+                were not found in the token stream.
+        """
         provided_args = set()
         for child in command_node.children:
             if isinstance(child, ArgumentNode):

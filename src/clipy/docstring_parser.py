@@ -3,21 +3,46 @@ from typing import Dict, Tuple
 
 
 class DocstringParser(abc.ABC):
+    """
+    Abstract base class for docstring parsers.
+
+    Subclasses implement language/style-specific parsing logic to extract
+    the function description and per-argument help strings.
+    """
+
     @abc.abstractmethod
     def parse(self, docstring: str) -> Tuple[Dict[str, str], str]:
+        """
+        Parse a raw docstring into its component parts.
+
+        Args:
+            docstring: The raw docstring text to parse.
+
+        Returns:
+            Tuple[Dict[str, str], str]: A tuple of ``(args_dict, description)``
+            where *args_dict* maps parameter names to their help text and
+            *description* is the overall function description.
+        """
         pass
 
 
 class GoogleStyleDocstringParser(DocstringParser):
+    """Minimal parser for Google-style docstrings.
+
+    Recognises an ``Args:`` section and extracts per-argument descriptions,
+    including multi-line continuations.
+    """
+
     def parse(self, docstring: str) -> Tuple[Dict[str, str], str]:
-        """
-        Parses a Google-style docstring and returns a tuple (args_dict, description).
+        """Parse a Google-style docstring and return its components.
 
         Args:
-            docstring (str): The docstring to parse.
+            docstring: The raw docstring text to parse.
 
         Returns:
-            tuple: (dict of argument descriptions, overall description string).
+            Tuple[Dict[str, str], str]: A tuple of ``(args_dict, description)``
+            where *args_dict* maps parameter names to their help text and
+            *description* is the overall function description.
         """
         args_dict: Dict[str, str] = {}
 
