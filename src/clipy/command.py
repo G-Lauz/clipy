@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import sys
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, get_origin
 
 from .argument import Argument
 from .ast.error import ParseError
@@ -231,7 +231,11 @@ class Command:
 
                 # Get the type name from annotation
                 if param.annotation is not inspect.Parameter.empty:
-                    type_name = param.annotation.__name__
+                    origin = get_origin(param.annotation) or param.annotation
+                    try:
+                        type_name = origin.__name__
+                    except AttributeError:
+                        type_name = str(param.annotation)
                 else:
                     type_name = "str"  # default type
 
