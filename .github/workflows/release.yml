@@ -26,7 +26,8 @@ jobs:
           minor_pattern: "(MINOR)"
           format: "${major}.${minor}.${patch}-pre${increment}"
           short_tags: false
-          bump_each_commit: true
+          bump_each_commit: false
+          bump_each_commit_patch_pattern: "(PATCH)"
 
       - name: Generate version number
         id: generate_version_output
