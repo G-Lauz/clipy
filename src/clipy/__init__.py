@@ -1,15 +1,12 @@
-"""Core module of Clipy"""
+from importlib.metadata import version
 
-from .cli_types import CommandDefinition, OptionDefinition
-from .clipy import argument, command
-from .decorators import App, Command, Option
+from .argument import Argument
+from .command import Command
+
+__version__ = version("clipyx")
+
 
 __all__ = [
-    "command",
-    "argument",
-    "Option",
+    "Argument",
     "Command",
-    "App",
-    "CommandDefinition",
-    "OptionDefinition",
 ]
