@@ -10,6 +10,7 @@ from .ast.error import ParseError
 from .ast.parser import Parser
 from .ast.processor import CommandExecutor
 from .docstring_parser import GoogleStyleDocstringParser
+from .utils import resolve_type_hints, unwrap_optional
 
 
 class Command:
@@ -167,6 +168,10 @@ class Command:
         self.signature = inspect.signature(self.func)
         parameters = self.signature.parameters
 
+        # Annotations reach `inspect.signature` as strings under PEP 563; resolve them once
+        # so everything downstream can rely on `Argument.type` being a real type object.
+        type_hints = resolve_type_hints(self.func)
+
         # Build the list of arguments
         for name, param in parameters.items():
             # TODO: better handling of 'self' and 'cls'
@@ -175,9 +180,11 @@ class Command:
 
             self._handle_reserved_keyword_error(name)
 
-            annotation = (
-                param.annotation if param.annotation is not inspect.Parameter.empty else None
-            )
+            annotation = type_hints.get(name, param.annotation)
+            if annotation is inspect.Parameter.empty:
+                annotation = None
+
+            annotation = unwrap_optional(annotation)
 
             argument = Argument(
                 name=name,

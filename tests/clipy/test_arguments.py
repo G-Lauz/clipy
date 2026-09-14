@@ -1,7 +1,11 @@
-from typing import Dict, List
+import sys
+from typing import Dict, List, Optional, Union
 from unittest.mock import patch
 
+import pytest
+
 import clipy
+from clipy.utils import unwrap_optional
 
 
 def test_optional_args():
@@ -274,3 +278,49 @@ def test_variable_kwargs():
     with patch("sys.argv", ["test.py", "42", "--key1", "value1", "--key2", "value2"]):
         result = func()  # pylint: disable=no-value-for-parameter
         assert result == (42, {"key1": "value1", "key2": "value2"})
+
+
+# ============================================================================
+# Optional arguments
+# ============================================================================
+
+
+def test_optional_arg_casts_as_its_inner_type():
+    @clipy.Command
+    def func(value: Optional[int] = None):
+        return value
+
+    assert func.args["value"].type is int
+
+    with patch("sys.argv", ["test.py", "--value", "42"]):
+        assert func() == 42
+
+    with patch("sys.argv", ["test.py"]):
+        assert func() is None
+
+
+def test_optional_list_arg():
+    @clipy.Command
+    def func(values: Optional[List[int]] = None):
+        return values
+
+    with patch("sys.argv", ["test.py", "--values", "1", "2"]):
+        assert func() == [1, 2]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="PEP 604 unions require Python 3.10+")
+def test_pep604_optional_arg():
+    @clipy.Command
+    def func(value: int | None = None):
+        return value
+
+    assert func.args["value"].type is int
+
+    with patch("sys.argv", ["test.py", "--value", "42"]):
+        assert func() == 42
+
+
+def test_union_of_several_types_is_left_unchanged():
+    # There is no single cast target for a multi-type union, so the annotation
+    # is preserved as-is rather than silently picking one of the arms.
+    assert unwrap_optional(Union[int, str]) == Union[int, str]
