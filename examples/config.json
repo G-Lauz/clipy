@@ -1,0 +1,7 @@
+{
+    "name": "baseline",
+    "epochs": 50,
+    "optimizer": {
+        "lr": 0.01
+    }
+}

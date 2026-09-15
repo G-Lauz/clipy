@@ -10,12 +10,54 @@ globals that annotation resolution looks in.
 
 from __future__ import annotations
 
+import dataclasses
+import json
 from typing import Dict, List, Optional
 from unittest.mock import patch
 
 import pytest
 
 import clipy
+
+
+@dataclasses.dataclass
+class Nested(clipy.Config):
+    """
+    Nested settings.
+
+    Args:
+        lr: Learning rate
+    """
+
+    lr: float = 0.001
+
+
+@dataclasses.dataclass
+class Settings(clipy.Config):
+    """
+    Settings for a run.
+
+    Args:
+        name: Run name
+        epochs: Number of epochs
+        nested: Nested settings
+    """
+
+    name: str
+    epochs: int = 10
+    nested: Nested = dataclasses.field(default_factory=Nested)
+
+
+@clipy.Command
+def configured(config: Settings, verbose: bool = False):
+    """
+    A command taking a config file.
+
+    Args:
+        config: Path to the config file
+        verbose: Print progress
+    """
+    return config, verbose
 
 
 @clipy.Command
@@ -123,6 +165,41 @@ def test_invalid_type_error_renders_with_postponed_annotations(capsys):
     assert exc_info.value.code == 1
     output = capsys.readouterr().out
     assert "expected argument of type: int" in output
+
+
+def test_config_annotation_is_resolved(tmp_path):
+    # Without resolution `is_config` would not recognise the string annotation,
+    # and the command would silently receive the path instead of a config.
+    assert configured.args["config"].type is Settings
+
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"name": "run-1", "nested": {"lr": 0.5}}), encoding="utf-8")
+
+    with patch("sys.argv", ["test.py", "--config", str(path)]):
+        config, verbose = configured()  # pylint: disable=no-value-for-parameter
+        assert config == Settings(name="run-1", nested=Nested(lr=0.5))
+        assert verbose is False
+
+
+def test_config_field_annotations_are_resolved(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"name": "run-1", "epochs": 50}), encoding="utf-8")
+
+    with patch("sys.argv", ["test.py", "--config", str(path)]):
+        config, _ = configured()  # pylint: disable=no-value-for-parameter
+        assert isinstance(config.epochs, int)
+        assert isinstance(config.nested, Nested)
+
+
+def test_config_help_renders_with_postponed_annotations(capsys):
+    with patch("sys.argv", ["test.py", "--help"]):
+        with pytest.raises(SystemExit):
+            configured()  # pylint: disable=no-value-for-parameter
+
+    output = capsys.readouterr().out
+    assert "[--config <path>]" in output
+    assert "config file fields (--config, JSON):" in output
+    assert "nested.lr:float" in output
 
 
 def test_unresolvable_annotation_raises_at_decoration():

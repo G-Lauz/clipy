@@ -5,8 +5,16 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, List
 
-from ..utils import get_dict_key_value_types, get_list_inner_type, is_dict, is_list
+from ..config import ConfigError
+from ..utils import (
+    get_dict_key_value_types,
+    get_list_inner_type,
+    is_config,
+    is_dict,
+    is_list,
+)
 from .error import (
+    ConfigFileError,
     InvalidArgumentTypeError,
     MissingRequiredArgumentError,
     MissingRequiredValueError,
@@ -79,6 +87,12 @@ class Parser:
             InvalidArgumentTypeError: If the value cannot be cast to the target type.
         """
         if target_type is None:
+            return value_str
+        if is_config(target_type):
+            # A config type is built from the file's contents, not from the path, and
+            # calling it here would quietly pass the path as its first field. Keep the
+            # raw path; `_finalize_config_nodes` reads the file once this command's
+            # tokens are all consumed.
             return value_str
         try:
             return target_type(value_str)
@@ -202,8 +216,81 @@ class Parser:
                 # Unexpected token type
                 raise UnknownTokenTypeError(token)
 
+        self._finalize_config_nodes(command_node)
         self.check_expected_args(command_node)
         return command_node
+
+    def _finalize_config_nodes(self, command_node: CommandNode) -> None:
+        """
+        Read the configuration files named on this command and apply their policy.
+
+        Runs once every token for *command_node* has been consumed, so a policy
+        sees the command line in full before deciding what the file contributes
+
+        Args:
+            command_node: The :class:`.CommandNode` whose configuration
+                arguments should be resolved.
+
+        Raises:
+            ParseError: If a configuration file cannot be read, or does not
+                match the type its argument declares.
+        """
+        config_nodes = [
+            child
+            for child in command_node.children
+            if isinstance(child, ArgumentNode) and is_config(child.arg_instance.type)
+        ]
+        if not config_nodes:
+            return
+
+        # `--help` describes the command even when its configuration is unreadable,
+        # the same way it takes precedence over missing required arguments.
+        if any(
+            isinstance(child, ArgumentNode) and child.arg_instance.name == "help" and child.value
+            for child in command_node.children
+        ):
+            return
+
+        cli_values = {
+            child.arg_instance.name: child.value
+            for child in command_node.children
+            if isinstance(child, ArgumentNode) and child not in config_nodes
+        }
+
+        for node in config_nodes:
+            config_type = node.arg_instance.type
+
+            try:
+                node.value = config_type.from_file(node.value)
+            except ConfigError as error:
+                raise ConfigFileError(error, node.token) from error
+
+            for name, value in config_type.contribute(node.value, cli_values).items():
+                self._apply_contributed_value(command_node, name, value, node.token)
+
+    @staticmethod
+    def _apply_contributed_value(
+        command_node: CommandNode, name: str, value: object, token: Token
+    ) -> None:
+        """
+        Set a command argument to a value supplied by a configuration file.
+
+        Args:
+            command_node: The :class:`.CommandNode` to update.
+            name: Name of the argument the value belongs to.
+            value: The value contributed by the configuration.
+            token: The :class:`.Token` that named the configuration file.
+        """
+        argument = (command_node.cmd_instance.args or {}).get(name)
+        if argument is None:
+            return
+
+        for child in command_node.children:
+            if isinstance(child, ArgumentNode) and child.arg_instance.name == name:
+                child.value = value
+                return
+
+        command_node.add_child(ArgumentNode(argument, value, token))
 
     def _try_handle_subcommand(self, token: Token, command_node: CommandNode) -> bool:
         """
@@ -274,7 +361,7 @@ class Parser:
             return 0
 
         value = self._cast_value(token.value, argument.type, token)
-        argument_node = ArgumentNode(argument, value)
+        argument_node = ArgumentNode(argument, value, token)
         command_node.add_child(argument_node)
         return 1
 
@@ -384,7 +471,7 @@ class Parser:
 
             value = self._cast_value(value_token.value, argument.type, value_token)
 
-            option_node = ArgumentNode(argument, value)
+            option_node = ArgumentNode(argument, value, value_token)
             command_node.add_child(option_node)
 
         else:

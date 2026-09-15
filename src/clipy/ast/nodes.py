@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, Any, List, Optional
 
 if TYPE_CHECKING:
     from clipy import Argument, Command
 
     from .processor import ASTProcessor
+    from .tokenizer import Token
 
 
 class ASTNode(abc.ABC):
@@ -83,18 +84,23 @@ class ArgumentNode(ASTNode):
     Attributes:
         arg_instance: The :class:`.Argument` descriptor for this node.
         value: The parsed, type-cast value for the argument.
+        token: The :class:`.Token` the value came from, when the value needs to
+            be resolved after parsing and any failure has to be reported back
+            at its original position.
     """
 
     arg_instance: Argument
 
-    def __init__(self, arg_instance: Argument, value: Any = None):
+    def __init__(self, arg_instance: Argument, value: Any = None, token: Optional[Token] = None):
         """
         Args:
             arg_instance: The :class:`.Argument` this node represents.
             value: The parsed value; ``None`` when no value was provided.
+            token: The :class:`.Token` the value was read from, if any.
         """
         self.arg_instance = arg_instance
         self.value = value
+        self.token = token
 
     def accept(self, visitor: ASTProcessor) -> Any:
         """

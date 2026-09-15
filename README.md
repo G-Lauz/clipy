@@ -65,7 +65,7 @@ python greeting.py --not-an-arg
 ```
 **Supported Python versions**: 3.9 and above.
 
-For more complex examples, like [automatic casting](./examples/typed_cli.py),[ nested commands](./examples/deep_nested_cli.py), [variable number of arguments](./examples/typed_cli.py#L70), and more, check the [examples](./examples/) folder.
+For more complex examples, like [automatic casting](./examples/typed_cli.py),[ nested commands](./examples/deep_nested_cli.py), [variable number of arguments](./examples/typed_cli.py#L70), [configuration files as arguments](./examples/config_cli.py), and more, check the [examples](./examples/) folder.
 
 ## Installation
 `clipy` is available on PyPI, you can install it using pip:
@@ -92,7 +92,8 @@ There are already many CLI libraries in Python, such as [`argparse`](https://doc
 The goal here isn't to replace them, but provide an alternative that emphasizes a different design philosophy. `clipy` is designed to be as close to regular Python code as possible, making it easy to learn and use. You should use `clipy` when you want to focus on the logic of your application rather than the CLI framework.
 
 ## Roadmap
-- [ ] Support configuration files as arguments (e.g. `json`, `yaml`, etc.).
+- [x] Support configuration files as arguments (`json` is supported, `yaml` and others to follow).
+- [ ] Support configuration policy (e.g. override CLI arguments, soft merge, etc.).
 - [ ] Support short and combined short options (e.g. `-h` for `--help` and `-abc`).
 - [ ] Support a wider range of argument types (e.g. `pathlib.Path`, `enum`, etc.).
 - See the issue tracker for more details and to contribute.

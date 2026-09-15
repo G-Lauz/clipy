@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import inspect
 import sys
 from typing import Callable, Dict, List, get_origin
@@ -9,8 +10,31 @@ from .argument import Argument
 from .ast.error import ParseError
 from .ast.parser import Parser
 from .ast.processor import CommandExecutor
+from .config import LOADERS
 from .docstring_parser import GoogleStyleDocstringParser
-from .utils import resolve_type_hints, unwrap_optional
+from .utils import is_config, resolve_type_hints, unwrap_optional
+
+
+def _display_type_name(argument: Argument) -> str:
+    """
+    Return the type name shown for *argument* in usage and help output.
+
+    Args:
+        argument: The :class:`.Argument` to describe, or ``None`` when the
+            parameter has no matching argument.
+
+    Returns:
+        str: The type name to display.
+    """
+    annotation = argument.type if argument is not None else None
+
+    if is_config(annotation):
+        return "path"
+    if annotation is None:
+        return "str"
+
+    origin = get_origin(annotation) or annotation
+    return getattr(origin, "__name__", None) or str(annotation)
 
 
 class Command:
@@ -186,6 +210,9 @@ class Command:
 
             annotation = unwrap_optional(annotation)
 
+            if is_config(annotation):
+                self._handle_config_argument_error(name, annotation, param)
+
             argument = Argument(
                 name=name,
                 type=annotation,
@@ -232,19 +259,11 @@ class Command:
         if has_own_args:
             parameters: Dict[str, inspect.Parameter] = command.signature.parameters
 
-            for name, param in parameters.items():
+            for name in parameters:
                 if name in ("self", "cls"):
                     continue
 
-                # Get the type name from annotation
-                if param.annotation is not inspect.Parameter.empty:
-                    origin = get_origin(param.annotation) or param.annotation
-                    try:
-                        type_name = origin.__name__
-                    except AttributeError:
-                        type_name = str(param.annotation)
-                else:
-                    type_name = "str"  # default type
+                type_name = _display_type_name((command.args or {}).get(name))
 
                 # All parameters are optional (wrapped in [])
                 usage_parts.append(f"[--{name} <{type_name}>]")
@@ -276,12 +295,7 @@ class Command:
             # Get the max length of argument names for formatting
             max_arg_length = max(len(arg.name) for arg in self.args.values()) if self.args else 0
             max_type_length = (
-                max(
-                    len(arg.type.__name__) if arg.type is not None else 3
-                    for arg in self.args.values()
-                )
-                if self.args
-                else 0
+                max(len(_display_type_name(arg)) for arg in self.args.values()) if self.args else 0
             )
 
             for arg in self.args.values():
@@ -291,7 +305,7 @@ class Command:
                 if arg.type != bool:
                     value_str = arg.name.upper()
 
-                type_name = f":{arg.type.__name__}" if arg.type is not None else ":str"
+                type_name = f":{_display_type_name(arg)}"
                 if arg.type == bool:
                     type_name = ""
 
@@ -314,6 +328,11 @@ class Command:
                     + f"{arg.help}{default_str}"
                 )
 
+        if has_own_args:
+            for arg in self.args.values():
+                if is_config(arg.type):
+                    help_lines.extend(self._get_config_help(arg))
+
         if self.is_group:
             if has_own_args:
                 help_lines.append("")  # blank line between options and subcommands
@@ -323,6 +342,44 @@ class Command:
                 help_lines.append(f"  {subcmd.name}: {desc}")
 
         return "\n".join(help_lines)
+
+    @staticmethod
+    def _get_config_help(argument: Argument) -> List[str]:
+        """
+        Render the fields a configuration argument reads from its file.
+
+        Args:
+            argument: The configuration :class:`.Argument` to describe.
+
+        Returns:
+            List[str]: The help lines for this configuration, led by a blank
+            separator line, or an empty list if it declares no fields.
+        """
+        fields = argument.type.describe()
+        if not fields:
+            return []
+
+        formats = ", ".join(sorted(suffix.lstrip(".").upper() for suffix in LOADERS))
+        lines = ["", f"config file fields (--{argument.name}, {formats}):"]
+
+        # Nested fields are indented
+        max_label_length = max(
+            2 * field.depth + len(f"{field.path}:{field.type_name}") for field in fields
+        )
+
+        for field in fields:
+            label = f"{field.path}:{field.type_name}"
+            spaces = max(max_label_length - 2 * field.depth - len(label) + 2, 1)
+
+            default_str = ""
+            if not field.required and field.default is not None:
+                default_str = f" (default: {field.default})"
+
+            lines.append(
+                " " * (2 + 2 * field.depth) + label + " " * spaces + f"{field.help}{default_str}"
+            )
+
+        return lines
 
     def _handle_parsing_error(
         self, error: ParseError, argv: List[str], command_tree: List[Command]
@@ -342,6 +399,43 @@ class Command:
 
         print(f"{self.name}: error: {error.message}")
         sys.exit(1)
+
+    def _handle_config_argument_error(
+        self, name: str, config_type: type, param: inspect.Parameter
+    ) -> None:
+        """
+        Reject a configuration parameter that cannot work, at decoration time.
+
+        Args:
+            name: Name of the parameter being declared.
+            config_type: The :class:`clipy.Config` subclass it is annotated with.
+            param: The :class:`inspect.Parameter` being turned into an argument.
+
+        Raises:
+            SyntaxError: If the configuration type or the parameter is unusable.
+        """
+        if not dataclasses.is_dataclass(config_type):
+            raise SyntaxError(
+                f"'{config_type.__name__}' subclasses clipy.Config but is not a dataclass, so its "
+                f"fields cannot be read. Apply @dataclasses.dataclass to it."
+            )
+
+        for field in dataclasses.fields(config_type):
+            if field.name in self.RESERVED_KEYWORDS:
+                raise SyntaxError(
+                    f"'{field.name}' is a reserved keyword argument and cannot be used as a field "
+                    f"name in config class '{config_type.__name__}'."
+                )
+
+        # A default never passes through the parser, so it would reach the command
+        # as a path string where the annotation expects a config object.
+        if param.default is not inspect.Parameter.empty and param.default is not None:
+            raise SyntaxError(
+                f"config argument '{name}' cannot have a default of "
+                f"{param.default!r}: a default is passed to the command as-is and is never read "
+                f"as a config file. Use '{name}: {config_type.__name__} = None' and handle None, "
+                f"or make the argument required."
+            )
 
     def _handle_reserved_keyword_error(self, name: str) -> None:
         if name in self.RESERVED_KEYWORDS:

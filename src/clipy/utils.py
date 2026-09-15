@@ -93,6 +93,20 @@ def get_list_inner_type(annotations: type) -> type:
     return str
 
 
+def is_config(annotations: type) -> bool:
+    """Check whether *annotations* represents a configuration file type.
+
+    Detection reads the ``__clipy_config__`` marker set by :class:`clipy.Config`.
+
+    Args:
+        annotations: A Python type annotation to inspect.
+
+    Returns:
+        bool: True if *annotations* is a :class:`clipy.Config` subclass.
+    """
+    return getattr(annotations, "__clipy_config__", False) is True
+
+
 def is_dict(annotations: type) -> bool:
     """Check whether *annotations* represents a dict type.
 

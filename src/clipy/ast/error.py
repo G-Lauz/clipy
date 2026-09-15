@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+from ..config import ConfigError
 from .tokenizer import Token
 
 
@@ -100,6 +101,22 @@ class InvalidArgumentTypeError(ParseError):
         """
         message = f"expected argument of type: {expected_type}, but got: {token.value}"
         super().__init__(message, token)
+
+
+class ConfigFileError(ParseError):
+    """
+    Exception raised when a configuration file cannot be used.
+    """
+
+    def __init__(self, error: ConfigError, token: Token) -> None:
+        """
+        Args:
+            error: The :class:`~clipy.config.ConfigError` raised while reading
+                the file.
+            token: The :class:`.Token` holding the file path.
+        """
+        super().__init__(f"config file '{token.value}': {error}", token)
+        self.error = error
 
 
 # Internal error
